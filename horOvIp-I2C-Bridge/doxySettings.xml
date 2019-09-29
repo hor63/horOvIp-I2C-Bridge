@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<DoxySettings xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <SettingsFile>C:\Users\kai_horstmann\Documents\Atmel Studio\7.0\horOvIp-I2C-Bridge\horOvIp-I2C-Bridge\doxySettings.xml</SettingsFile>
+  <ProjectName>horOvIp-I2C-Bridge</ProjectName>
+  <DoxyExePath>C:\Program Files\doxygen\bin\doxygen.exe</DoxyExePath>
+  <UseDefaultSettings>true</UseDefaultSettings>
+  <GenerateAsPartOfBuild>false</GenerateAsPartOfBuild>
+  <ConfigFilePath>C:\Users\kai_horstmann\Documents\Atmel Studio\7.0\horOvIp-I2C-Bridge\horOvIp-I2C-Bridge\doxyfile</ConfigFilePath>
+  <OutputDirPath>C:\Users\kai_horstmann\Documents\Atmel Studio\7.0\horOvIp-I2C-Bridge\horOvIp-I2C-Bridge\doxygen</OutputDirPath>
+  <ShowErrorsAndWarnings>false</ShowErrorsAndWarnings>
+</DoxySettings>
