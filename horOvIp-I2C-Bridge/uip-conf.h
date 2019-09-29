@@ -104,8 +104,9 @@ typedef unsigned short uip_stats_t;
  * uIP buffer size.
  *
  * \hideinitializer
+ * \see IP_BUFFER_SIZE
  */
-#define UIP_CONF_BUFFER_SIZE     200
+#define UIP_CONF_BUFFER_SIZE     IP_BUFFER_SIZE
 
 /**
  * CPU byte order.
