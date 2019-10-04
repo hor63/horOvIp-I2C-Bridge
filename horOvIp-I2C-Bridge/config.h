@@ -51,7 +51,15 @@
  */
 #define SLIP_BAUD_RATE 9600UL
 
+/**
+ * Baud rate of the debugging port
+ */
+#define DEBUG_PORT_BAUD_RATE 115200UL
 
-
+/** 
+ * Is debug printing on?
+ * Set this 1 or 0
+ */
+#define DEBUG_PRINT 1
 
 #endif /* CONFIG_H_ */

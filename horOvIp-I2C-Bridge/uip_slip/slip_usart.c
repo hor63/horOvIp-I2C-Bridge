@@ -13,6 +13,8 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 
+#include "serDebugOut.h"
+
 /// The term "(F_CPU + SLIP_BAUD_RATE*8)" rounds the UBRR value to the next integer 
 #define USART_BAUD_CONFIG_VAL (((F_CPU + SLIP_BAUD_RATE*8)/(16*SLIP_BAUD_RATE))-1)
 /// Calculate the actual baud rate in mHz
@@ -180,10 +182,10 @@ volatile bool recvDataPresent = false;
 #define SLIP_END ((uint8_t)0300)
 /// SLIP Escaped ESC character. Is sent in a sequence with SLIP_ESC when an ESC character is in the user data
 /// \see [RFC 1055](https://tools.ietf.org/html/rfc1055)
-#define SLIP_ESC_ESC ((uint8_t)0334)
+#define SLIP_ESC_ESC ((uint8_t)335)
 /// SLIP Escaped END character. Is sent in a sequence with SLIP_ESC when an END character is in the user data
 /// \see [RFC 1055](https://tools.ietf.org/html/rfc1055)
-#define SLIP_ESC_END ((uint8_t)0335)
+#define SLIP_ESC_END ((uint8_t)0334)
 
 /** \brief Reset the administration of the read buffer to an empty buffer
  *
@@ -381,6 +383,10 @@ void slipProcessReadBuffer() {
 
 		currSegment = (TRecvBufferSegment*)(recvBuffer + recvFirstSegmentIndex);
 
+		DEBUG_OUT("Received segment, len= ");
+		DEBUG_UINT_OUT(currSegment->header.dataLen);
+		DEBUG_CHR_OUT('\n');
+
 		memcpy(uip_buf,currSegment->data,currSegment->header.dataLen);
 			
 		// Process the message by uIP.
@@ -520,6 +526,7 @@ ISR(USART0_RX_vect) {
 	while (statusRegA & _BV(RXC0)) {
 		recvChar = UDR0;
 
+
 		// Throw away any data when the buffer is full, or in flush mode until the next END character is received.
 		if (recvFlushMsg ) {
 			if (recvChar == SLIP_END) {
@@ -565,6 +572,7 @@ ISR(USART0_RX_vect) {
 							recvBehindLastSegmentIndex = recvCurrSegmentIndex + sizeof(TRecvBufferSegmentHeader) + recvCurrSegment->header.dataLen;
 								
 							// Switch to the next segment if there is enough space available in the buffer
+							recvCurrSegment = NULL;
 							setNewRecvSegment();
 							
 							recvDataPresent = true;
@@ -595,6 +603,7 @@ ISR(USART0_RX_vect) {
 						}
 						
 						recvCurrSegment->data[recvSegmentCursor] = recvChar;
+						++recvSegmentCursor;
 					
 					} // if (recvChar == SLIP_END)
 					
@@ -609,6 +618,7 @@ ISR(USART0_RX_vect) {
 	
 	
 }
+
 
 // The send buffer is ready to take another byte to be sent
 ISR(USART0_UDRE_vect) {
@@ -652,7 +662,8 @@ ISR(USART0_UDRE_vect) {
 						break;
 				} // if (sendCurrSegmentCursor >= sendCurrSegment->header.dataLen)
 
-			UDR0 = sendEscCharToSend;
+			UDR0 = sendChar;
+			++sendCurrSegmentCursor;
 				
 			}
 		} // if (sendEscCharToSend != 0)

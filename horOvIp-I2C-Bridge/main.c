@@ -14,6 +14,7 @@
 #include "uip.h"
 #include "uip_slip/slip_usart.h"
 #include "timers.h"
+#include "serDebugOut.h"
 
 int main(void) {
 	uint8_t i;
@@ -31,6 +32,11 @@ int main(void) {
 	DDRC &= _BV(PC2)|_BV(PC3)|_BV(PC4)|_BV(PC5);
 	PORTC |= ~(_BV(PC2)|_BV(PC3)|_BV(PC4)|_BV(PC5));
 	
+	set_sleep_mode(0);
+	
+	DEBUG_INIT();
+	DEBUG_OUT("horOV IMU board V0.1 STARTUP\n");
+	
 	uip_init();
 
 	slipInit();
@@ -39,7 +45,7 @@ int main(void) {
 		uip_ipaddr_t addr;
 		uip_ipaddr(&addr, 192,168,203,2);
 		uip_sethostaddr(&addr);
-		uip_ipaddr(&addr, 255,255,255,0);
+		uip_ipaddr(&addr, 192,255,255,0);
 		uip_setnetmask(&addr);
 		uip_ipaddr(&addr, 192,168,203,1);
 		uip_setdraddr(&addr);
@@ -50,7 +56,6 @@ int main(void) {
 
 	timersStart();
 	
-    /* Replace with your application code */
     while (1) {
 		
 		slipProcessReadBuffer();
@@ -73,6 +78,7 @@ int main(void) {
 				}
 			}
 		}
+			
 		
 		cli();
 		sleep_enable();

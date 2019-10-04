@@ -173,6 +173,12 @@
     <Compile Include="main.c">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="serDebugOut.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="serDebugOut.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="timers.c">
       <SubType>compile</SubType>
     </Compile>
