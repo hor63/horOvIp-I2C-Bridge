@@ -14,6 +14,7 @@
 #include "uip.h"
 #include "uip_slip/slip_usart.h"
 #include "timers.h"
+#include "I2C.h"
 #include "serDebugOut.h"
 
 int main(void) {
@@ -35,7 +36,7 @@ int main(void) {
 	set_sleep_mode(0);
 	
 	DEBUG_INIT();
-	DEBUG_OUT("horOV IMU board V0.1 STARTUP\n");
+	DEBUG_OUT("\n\nhorOV IMU board V0.1\n");
 	
 	uip_init();
 
@@ -51,10 +52,22 @@ int main(void) {
 		uip_setdraddr(&addr);
 	}
 	uip_listen(HTONS(19463));
-	
+
+	// Start interrupts here
+	sei();
+
+	I2CTestSequences();
+
+	// Let other components start up safely, e.g. the IMU
+	_delay_ms(500);
+
 	slipStart();
 
 	timersStart();
+
+	DEBUG_OUT("STARTUP done\n");
+
+	//I2CTest();
 	
     while (1) {
 		

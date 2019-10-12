@@ -10,7 +10,8 @@
 #define I2C_H_
 
 
-
+void I2CTest();
+void I2CTestSequences();
 
 
 #endif /* I2C_H_ */
