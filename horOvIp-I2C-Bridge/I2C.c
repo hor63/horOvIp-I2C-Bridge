@@ -5,14 +5,12 @@
  *  Author: kai_horstmann
  */ 
 
-#include <stddef.h>
-#include <stdint.h>
-#include <stdbool.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
 
 #include "uip.h"
 #include "serDebugOut.h"
+#include "i2c.h"
 
 #include <util/delay.h>
 
@@ -50,19 +48,6 @@ enum I2CAction {
 	ACT_SEND_STOP
 	};
 
-enum I2CStatus {
-	STAT_IDLE,
-	STAT_START_SENT,
-	STAT_RESTART_SENT,
-	STAT_ADDR_W_SENT,
-	STAT_ADDR_R_SENT,
-	STAT_BYTE_SENT,
-	STAT_LAST_BYTE_SENT,
-	STAT_BYTE_RECEIVED,
-	STAT_LAST_BYTE_RECEIVED,
-	STAT_STOP_SENT
-};
-	
 	
 typedef struct {
 	enum I2CStatus nextStatusOK;
@@ -73,8 +58,10 @@ typedef struct {
 	} TActionSequence;	
 	
 static const TActionSequence sequenceSendBytes [] = {
+	
+	// Idle loops to itself.
 	//STAT_IDLE
-	{STAT_START_SENT,ACT_SEND_START,STAT_START_SENT,ACT_SEND_START,0xff},
+	{STAT_IDLE,ACT_NONE,STAT_IDLE,ACT_NONE,0xff},
 
 	//STAT_START_SENT,
 	{STAT_ADDR_W_SENT,ACT_SEND_ADDR_W,STAT_ADDR_W_SENT,ACT_SEND_ADDR_W,0x08},
@@ -110,8 +97,10 @@ static const TActionSequence sequenceSendBytes [] = {
 };
 
 static const TActionSequence sequenceReceiveBytesWithRegisterAdress [] = {
+
+	// Idle loops to itself.
 	//STAT_IDLE
-	{STAT_START_SENT,ACT_SEND_START,STAT_START_SENT,ACT_SEND_START,0xff},
+	{STAT_IDLE,ACT_NONE,STAT_IDLE,ACT_NONE,0xff},
 
 	//STAT_START_SENT,
 	{STAT_ADDR_W_SENT,ACT_SEND_ADDR_W,STAT_ADDR_W_SENT,ACT_SEND_ADDR_W,0x08},
@@ -148,8 +137,10 @@ static const TActionSequence sequenceReceiveBytesWithRegisterAdress [] = {
 };
 
 static const TActionSequence sequenceReceiveBytes [] = {
+
+	// Idle loops to itself.
 	//STAT_IDLE
-	{STAT_START_SENT,ACT_SEND_START,STAT_START_SENT,ACT_SEND_START,0xff},
+	{STAT_IDLE,ACT_NONE,STAT_IDLE,ACT_NONE,0xff},
 
 	//STAT_START_SENT,
 	{STAT_ADDR_R_SENT,ACT_SEND_ADDR_R,STAT_ADDR_R_SENT,ACT_SEND_ADDR_R,0x08},
@@ -185,12 +176,6 @@ static const TActionSequence sequenceReceiveBytes [] = {
 	{STAT_IDLE,ACT_NONE,STAT_IDLE,ACT_NONE,0xff}
 };
 
-enum I2CTransferResult {
-	I2C_RC_OK,
-	I2C_RC_ILLEGAL_SEQ,
-	I2C_RC_HW_ERROR,
-	I2C_RC_UNDEF
-	};
 
 /// The current applicable I2C sequence, i.e. points to the start of the sequence
 static const TActionSequence *currSequence = NULL;
@@ -223,32 +208,21 @@ static enum I2CTransferResult transferResult = I2C_RC_UNDEF;
 static uint8_t i2cHWStatusCode = 0;
 // The sequence status when an error occurred.
 static enum I2CStatus errSeqStatus = STAT_IDLE;
-
-// Assume I send and receive 3 bytes, the index for the hybrid read is 2 bytes long
-uint8_t rcSend [] = {0xff,0x08,0x18,0x28,0x28,0x28,0xff};
-uint8_t rcRecvWithIndex [] = {0xff,0x08,0x18,0x28,0x28,0x10,0x40,0x50,0x50,0x58,0xff};
-uint8_t rcRecvOnly [] = {0xff,0x08,0x40,0x50,0x50,0x58,0xff};
-
-static uint8_t tstSendBuffer[3];
-static uint8_t tstReceiveBuffer[3];
-
-
-static void testOneSequence();
-static void tstISR();
-static uint8_t *tstRcList;
-static uint8_t tstRcIndex;
 	
 
-void I2CTestSequences() {
+void I2CStartTransferSend (uint8_t slAddr, uint8_t *data, uint8_t dataLen) {
 	
-	// Test the write sequence
+	while (transferActive) {
+		__asm__ __volatile__ ("nop" ::: "memory");
+	}
+
 	currSequence = sequenceSendBytes;
-	currStatusIndex = STAT_IDLE;
+	currStatusIndex = STAT_START_SENT;
 	currSequenceStatus = &(currSequence[currStatusIndex]);
-	slaveAddr = 0x68;
-	lastSendIndex = 2;
+	slaveAddr = slAddr;
+	lastSendIndex = dataLen - 1;
 	currSendIndex = 0;
-	sendBuffer = tstSendBuffer;
+	sendBuffer = data;
 	
 	// Don't worry about receive stuff here.
 	
@@ -258,24 +232,40 @@ void I2CTestSequences() {
 	i2cHWStatusCode = 0;
 	errSeqStatus = STAT_IDLE;
 
-	tstRcList = rcSend;
-	tstRcIndex = 0;
+	__asm__ __volatile__ ("nop" ::: "memory");
+	// Activate I2C, activate the interrupt, occupy the bus, and send START
+	TWCR = 0
+	| _BV(TWINT)
+	// | _BV(TWEA)
+	| _BV(TWSTA)
+	// | _BV(TWSTO)
+	// | _BV(TWWC)
+	| _BV(TWEN)
+	| _BV(TWIE)
+	;
 	
-	
-	testOneSequence();
-	
+}
 
-	// Test the write/read sequence
+void I2CStartTransferSendReceive (
+	uint8_t slAddr, 
+	uint8_t *sendData,uint8_t sendDataLen,
+	uint8_t *recvData,uint8_t recvDataLen) {
+	
+	while (transferActive) {
+		__asm__ __volatile__ ("nop" ::: "memory");
+	}
+
 	currSequence = sequenceReceiveBytesWithRegisterAdress;
-	currStatusIndex = STAT_IDLE;
+	currStatusIndex = STAT_START_SENT;
 	currSequenceStatus = &(currSequence[currStatusIndex]);
-	slaveAddr = 0x68;
-	lastSendIndex = 1;
+	slaveAddr = slAddr;
+	lastSendIndex = sendDataLen - 1;
 	currSendIndex = 0;
-	sendBuffer = tstSendBuffer;
-	lastRecvIndex = 2;
+	sendBuffer = sendData;
+
+	lastRecvIndex = recvDataLen - 1;
 	currRecvIndex = 0;
-	recvBuffer = tstReceiveBuffer;
+	recvBuffer = recvData;
 	
 	transferActive = true;
 	transferResult = I2C_RC_OK;
@@ -283,90 +273,122 @@ void I2CTestSequences() {
 	i2cHWStatusCode = 0;
 	errSeqStatus = STAT_IDLE;
 
-	tstRcList = rcRecvWithIndex;
-	tstRcIndex = 0;
+	__asm__ __volatile__ ("nop" ::: "memory");
+	// Activate I2C, activate the interrupt, occupy the bus, and send START
+	TWCR = 0
+	| _BV(TWINT)
+	// | _BV(TWEA)
+	| _BV(TWSTA)
+	// | _BV(TWSTO)
+	// | _BV(TWWC)
+	| _BV(TWEN)
+	| _BV(TWIE)
+	;
 	
-	
-	testOneSequence();
-	
+}
 
-	// Test the read-only sequence
+void I2CStartTransferReceive (uint8_t slAddr, uint8_t *data, uint8_t dataLen) {
+	
+	while (transferActive) {
+		__asm__ __volatile__ ("nop" ::: "memory");
+	}
+
 	currSequence = sequenceReceiveBytes;
-	currStatusIndex = STAT_IDLE;
+	currStatusIndex = STAT_START_SENT;
 	currSequenceStatus = &(currSequence[currStatusIndex]);
-	slaveAddr = 0x68;
-	lastSendIndex = 1;
-	currSendIndex = 0;
-	sendBuffer = tstSendBuffer;
-	lastRecvIndex = 2;
+	slaveAddr = slAddr;
+	lastRecvIndex = dataLen - 1;
 	currRecvIndex = 0;
-	recvBuffer = tstReceiveBuffer;
-
+	recvBuffer = data;
+	
 	transferActive = true;
 	transferResult = I2C_RC_OK;
 	/// The status code of the I2C hardware when transferResult is not I2C_RC_OK.
 	i2cHWStatusCode = 0;
 	errSeqStatus = STAT_IDLE;
 
-	tstRcList = rcRecvOnly;
-	tstRcIndex = 0;
-
-
-	testOneSequence();
-
-}
-
-static void testOneSequence() {
-	
-	do {
-		
-		tstISR();
-		
-		tstRcIndex ++;
-		
-	} while (currStatusIndex != STAT_IDLE);
+	__asm__ __volatile__ ("nop" ::: "memory");
+	// Activate I2C, activate the interrupt, occupy the bus, and send START
+	TWCR = 0
+	| _BV(TWINT)
+	// | _BV(TWEA)
+	| _BV(TWSTA)
+	// | _BV(TWSTO)
+	// | _BV(TWWC)
+	| _BV(TWEN)
+	| _BV(TWIE)
+	;
 	
 }
 
-/// Mostly the prototype for the 
-static void tstISR() {
+enum I2CTransferResult waitGetTransferResult(
+	uint8_t *pHWStatus,
+	enum I2CStatus *pErrSeqStatus) {
 
-	uint8_t addrRW;
+	while (transferActive) {
+		__asm__ __volatile__ ("nop" ::: "memory");
+	}
 	
+	*pHWStatus = i2cHWStatusCode;
+	*pErrSeqStatus = errSeqStatus;
+	return transferResult;
+}
+
+bool I2CIsTransferActive() {
+	return transferActive;
+}
+
+
+/// Interrupt handler 
+ISR(TWI_vect){
+
 	uint8_t actualHWStatus;
-	enum I2CAction action;
 	uint8_t expectedHWStatus;
-	// Read the status register.
-	// Mask out the lower two bits as these are the prescaler.
-	// rc = TWSR & ~0b11;
-	actualHWStatus = tstRcList[tstRcIndex]; // Instead
+	enum I2CAction action;
 	
-	// When reading the by is ready to be picked up.
+	if (!currSequence || !currSequenceStatus) {
+		// Switch I2C off.
+		TWCR = 0;
+		transferActive = false;
+		currSequence = currSequenceStatus = NULL;
+		return;
+	}
+	
+	// When reading the byte is ready to be picked up.
 	if (currStatusIndex == STAT_LAST_BYTE_RECEIVED || currStatusIndex == STAT_BYTE_RECEIVED) {
 		recvBuffer[currRecvIndex] = TWDR;
 		
 		currRecvIndex++;
 	}
 	
+	// Read the HW status register.
+	// Mask out the lower two bits as these are the prescaler.
+	actualHWStatus = TWSR & ~0b11;
+
 	// Evaluate the expected code and the hardware status code
 	// First unconditional error conditions
 	expectedHWStatus = currSequenceStatus->expectStatusCode;
 	if (expectedHWStatus == 0) {
-		// I reached an unexpected status.
+		// Expected status 0 means I reached an illegal status. 
+		// This is due to an error of the status diagram definition, i.e. a program error.
 		transferResult = I2C_RC_ILLEGAL_SEQ;
 		errSeqStatus = currStatusIndex;
 		action = currSequenceStatus->nextActionNOK;
 		currStatusIndex = currSequenceStatus->nextStatusNOK;
 	} else { // if (expectedHWStatus == 0)
+		// Expected status 0xff means that the HW status is irrelevant.
 		if ((expectedHWStatus == 0xff) || (expectedHWStatus == actualHWStatus)) {
 			// Either the status does not matter or the expected status was assumed.
 			action = currSequenceStatus->nextActionOK;
 			currStatusIndex = currSequenceStatus->nextStatusOK;
-			
 		} else { // if ((expectedHWStatus == 0xff) || (expectedHWStatus == actualHWStatus))
+			// A different HW status is assumed than the expected one.
+			// Set error flags and codes.
+			// Perform cleanup, i.e. 
 			transferResult = I2C_RC_HW_ERROR;
-			action = currSequenceStatus->nextActionNOK;
 			errSeqStatus = currStatusIndex;
+			i2cHWStatusCode = actualHWStatus;
+			action = currSequenceStatus->nextActionNOK;
 			currStatusIndex = currSequenceStatus->nextStatusNOK;
 		} // if ((expectedHWStatus == 0xff) || (expectedHWStatus == actualHWStatus))
 	} // if (expectedHWStatus == 0)
@@ -381,53 +403,50 @@ static void tstISR() {
 	// And now: Action!
 	switch (action) {
 		case ACT_NONE:
-		
 			// Switch I2C off.
 			TWCR = 0;
-
 			transferActive = false;
-
+			// The status diagram ended.
+			currSequence = currSequenceStatus = NULL;
 			break;
 			
 		case ACT_SEND_START:
 			TWCR = 0
 				| _BV(TWINT)
-				// | TWEA
+				// | _BV(TWEA)
 				| _BV(TWSTA)
-				// | TWSTO
-				// | TWWC
+				// | _BV(TWSTO)
+				// | _BV(TWWC)
 				| _BV(TWEN)
-				// | TWIE
+				| _BV(TWIE)
 				;
 
 			break;
 			
 		case ACT_SEND_ADDR_W:
-			addrRW = i2CAddrByte(slaveAddr,false);
-			TWDR = addrRW;
+			TWDR = i2CAddrByte(slaveAddr,false);
 			TWCR = 0
 			| _BV(TWINT)
-			// | TWEA
-			// | TWSTA
-			// | TWSTO
-			// | TWWC
+			// | _BV(TWEA)
+			// | _BV(TWSTA)
+			// | _BV(TWSTO)
+			// | _BV(TWWC)
 			| _BV(TWEN)
-			// | TWIE
+			| _BV(TWIE)
 			;
 
 			break;
 			
 		case ACT_SEND_ADDR_R:
-			addrRW = i2CAddrByte(slaveAddr,true);
-			TWDR = addrRW;
+			TWDR = i2CAddrByte(slaveAddr,true);
 			TWCR = 0
 			| _BV(TWINT)
-			// | TWEA
-			// | TWSTA
-			// | TWSTO
-			// | TWWC
+			// | _BV(TWEA)
+			// | _BV(TWSTA)
+			// | _BV(TWSTO)
+			// | _BV(TWWC)
 			| _BV(TWEN)
-			// | TWIE
+			| _BV(TWIE)
 			;
 
 			break;
@@ -437,12 +456,12 @@ static void tstISR() {
 			TWDR = sendBuffer[currSendIndex];
 			TWCR = 0
 			| _BV(TWINT)
-			// | TWEA
-			// | TWSTA
-			// | TWSTO
-			// | TWWC
+			// | _BV(TWEA)
+			// | _BV(TWSTA)
+			// | _BV(TWSTO)
+			// | _BV(TWWC)
 			| _BV(TWEN)
-			// | TWIE
+			| _BV(TWIE)
 			;
 			
 			if (lastSendIndex == currSendIndex) {
@@ -458,11 +477,11 @@ static void tstISR() {
 			TWCR = 0
 			| _BV(TWINT)
 			| _BV(TWEA)
-			// | TWSTA
-			// | TWSTO
-			// | TWWC
+			// | _BV(TWSTA)
+			// | _BV(TWSTO)
+			// | _BV(TWWC)
 			| _BV(TWEN)
-			// | TWIE
+			| _BV(TWIE)
 			;
 
 			break;
@@ -471,12 +490,12 @@ static void tstISR() {
 			// Receive byte, send NACK to slave
 			TWCR = 0
 			| _BV(TWINT)
-			// | TWEA
-			// | TWSTA
-			// | TWSTO
-			// | TWWC
+			// | _BV(TWEA)
+			// | _BV(TWSTA)
+			// | _BV(TWSTO)
+			// | _BV(TWWC)
 			| _BV(TWEN)
-			// | TWIE
+			| _BV(TWIE)
 			;
 
 			break;
@@ -485,136 +504,21 @@ static void tstISR() {
 			// Send stop
 			TWCR = 0
 			| _BV(TWINT)
-			// | TWEA
-			// | TWSTA
+			// | _BV(TWEA)
+			// | _BV(TWSTA)
 			| _BV(TWSTO)
-			// | TWWC
+			// | _BV(TWWC)
 			| _BV(TWEN)
-			// | TWIE
+			| _BV(TWIE)
 			;
+
+			transferActive = false;
 
 			break;
 
 	}
-
 	
 	// proceed to the status for the next round.
 	currSequenceStatus = &(currSequence[currStatusIndex]);
 	
-}
-
-void I2CTest() {
-	
-	TWBR = TWI_BIT_RATE_REG_VAL;
-	
-	// Send start condition
-	TWCR = 0
-		| _BV(TWINT)
-		// | TWEA
-		| _BV(TWSTA)
-		// | TWSTO
-		// | TWWC
-		| _BV(TWEN)
-		// | TWIE
-		;
-	while (!(TWCR & _BV(TWINT)))	{}
-	
-	// Send the address and write
-	TWDR = i2CAddrByte(0x68,false);
-	TWCR = 0
-		| _BV(TWINT)
-		// | TWEA
-		// | TWSTA
-		// | TWSTO
-		// | TWWC
-		| _BV(TWEN)
-		// | TWIE
-		;
-	while (!(TWCR & _BV(TWINT)))	{}
-	
-	
-	DEBUG_OUT ("I2C Sent Address and Write, status = ");
-	DEBUG_UINT_HEX_OUT (TWSR);
-	DEBUG_CHR_OUT('\n');
-	
-	// Send the register number to read
-	TWDR = 0;
-	TWCR = 0
-		| _BV(TWINT)
-		// | TWEA
-		// | TWSTA
-		// | TWSTO
-		// | TWWC
-		| _BV(TWEN)
-		// | TWIE
-		;
-	while (!(TWCR & _BV(TWINT)))	{}
-	
-	DEBUG_OUT ("I2C Sent 0, status = ");
-	DEBUG_UINT_HEX_OUT (TWSR);
-	DEBUG_CHR_OUT('\n');
-		
-	// Send restart condition
-	TWCR = 0
-		| _BV(TWINT)
-		// | TWEA
-		| _BV(TWSTA)
-		// | TWSTO
-		// | TWWC
-		| _BV(TWEN)
-		// | TWIE
-		;
-	
-	while (!(TWCR & _BV(TWINT)))	{}
-	
-	
-	// Send the address and read
-	TWDR = i2CAddrByte(0x68,true);
-	TWCR = 0
-		| _BV(TWINT)
-		// | TWEA
-		// | TWSTA
-		// | TWSTO
-		// | TWWC
-		| _BV(TWEN)
-		// | TWIE
-		;
-	while (!(TWCR & _BV(TWINT)))	{}
-	
-	DEBUG_OUT ("I2C Sent Address and Read, status = ");
-	DEBUG_UINT_HEX_OUT (TWSR);
-	DEBUG_CHR_OUT('\n');
-	
-	// Read register 0 with NAK
-	TWCR = 0
-		| _BV(TWINT)
-		// | TWEA
-		// | TWSTA
-		// | TWSTO
-		// | TWWC
-		| _BV(TWEN)
-		// | TWIE
-		;
-	while (!(TWCR & _BV(TWINT)))	{}
-	
-	DEBUG_OUT ("I2C Read register 0, status = ");
-	DEBUG_UINT_HEX_OUT (TWSR);
-	DEBUG_CHR_OUT('\n');
-	DEBUG_OUT ("I2C register 0 value = ");
-	DEBUG_UINT_HEX_OUT (TWDR);
-	DEBUG_CHR_OUT('\n');
-
-	// Send stop
-	TWCR = 0
-		| _BV(TWINT)
-		// | TWEA
-		// | TWSTA
-		| _BV(TWSTO)
-		// | TWWC
-		| _BV(TWEN)
-		// | TWIE
-		;
-	while (!(TWCR & _BV(TWINT)))	{}
-	
-		
 }
