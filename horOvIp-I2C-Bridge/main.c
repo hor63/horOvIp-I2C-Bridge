@@ -15,6 +15,7 @@
 #include "uip_slip/slip_usart.h"
 #include "timers.h"
 #include "I2C.h"
+#include "BMX160.h"
 #include "serDebugOut.h"
 
 int main(void) {
@@ -56,8 +57,6 @@ int main(void) {
 	// Start interrupts here
 	sei();
 
-	I2CTestSequences();
-
 	// Let other components start up safely, e.g. the IMU
 	_delay_ms(500);
 
@@ -67,7 +66,7 @@ int main(void) {
 
 	DEBUG_OUT("STARTUP done\n");
 
-	//I2CTest();
+	BMX160Test();
 	
     while (1) {
 		
@@ -100,6 +99,7 @@ int main(void) {
 		sleep_disable();
     }
 	
+
 	
 }
 
