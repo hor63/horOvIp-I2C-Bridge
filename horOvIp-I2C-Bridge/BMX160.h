@@ -11,6 +11,8 @@
 
 #include "I2C.h"
 
+void initBMX160();
+
 void BMX160Test();
 
 #endif /* BMX160_H_ */
