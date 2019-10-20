@@ -42,7 +42,7 @@ void I2CStartTransferSendReceive (
 	uint8_t *recvData,uint8_t recvDataLen);
 void I2CStartTransferReceive (uint8_t slAddr, uint8_t *data, uint8_t dataLen);	
 bool I2CIsTransferActive();
-enum I2CTransferResult waitGetTransferResult(
+enum I2CTransferResult I2CWaitGetTransferResult(
 	uint8_t *pHWStatus,
 	enum I2CStatus *pErrSeqStatus);
 

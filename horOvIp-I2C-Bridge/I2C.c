@@ -321,7 +321,7 @@ void I2CStartTransferReceive (uint8_t slAddr, uint8_t *data, uint8_t dataLen) {
 	
 }
 
-enum I2CTransferResult waitGetTransferResult(
+enum I2CTransferResult I2CWaitGetTransferResult(
 	uint8_t *pHWStatus,
 	enum I2CStatus *pErrSeqStatus) {
 
