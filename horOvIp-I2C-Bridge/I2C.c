@@ -7,6 +7,7 @@
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include <avr/sleep.h>
 
 #include "uip.h"
 #include "serDebugOut.h"
@@ -325,9 +326,16 @@ enum I2CTransferResult I2CWaitGetTransferResult(
 	uint8_t *pHWStatus,
 	enum I2CStatus *pErrSeqStatus) {
 
+	cli();
 	while (transferActive) {
+		sleep_enable();
+		sei();
+		sleep_cpu();
+		sleep_disable();
+		cli();
 		__asm__ __volatile__ ("nop" ::: "memory");
 	}
+	sei();
 	
 	*pHWStatus = i2cHWStatusCode;
 	*pErrSeqStatus = errSeqStatus;

@@ -119,6 +119,16 @@ void debugOutUInt(unsigned int val) {
 	debugOutStr(utoa(val,convertBuf,10));
 }
 
+static const char hexNibbleVal[] = {
+	'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F',
+};
+
+void debugOutByteHex(unsigned char val) {
+	debugOutChr(hexNibbleVal[val>>4]);
+	debugOutChr(hexNibbleVal[val&0x0f]);
+}
+
+
 void debugOutUIntHex(unsigned int val) {
 	debugOutStr(utoa(val,convertBuf,16));
 }
