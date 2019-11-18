@@ -15,6 +15,10 @@
 
 #include "serDebugOut.h"
 
+/// \brief Indicator for the main loop that a package is waiting in the receive buffer
+bool slipBufferReceived = false;
+
+
 /// The term "(F_CPU + SLIP_BAUD_RATE*8)" rounds the UBRR value to the next integer 
 #define USART_BAUD_CONFIG_VAL (((F_CPU + SLIP_BAUD_RATE*8)/(16*SLIP_BAUD_RATE))-1)
 /// Calculate the actual baud rate in mHz
@@ -170,9 +174,6 @@ static bool recvFlushMsg = false;
 /// If true the next expected character is the masked ESC or masked END character.
 static bool recvEscReceived = false;
 
-/// Global flag for the main loop to indicate if there is a data segment in the receive buffer to process
-volatile bool recvDataPresent = false;
-
 // SLIP related stuff
 /// SLIP ESC character.
 /// \see [RFC 1055](https://tools.ietf.org/html/rfc1055)
@@ -234,7 +235,7 @@ static void initBuffers() {
  * If there is no space \ref recvCurrSegment is set NULL and \ref recvCurrSegmentIndex is RECV_INDEX_NONE.
  *
  */
-static void setNewRecvSegment() {
+static inline void setNewRecvSegment() {
 	if (!recvCurrSegment) {
 		// First check if there is no committed segment at all
 		if (recvFirstSegmentIndex == RECV_INDEX_NONE) {
@@ -510,12 +511,15 @@ void slipQueueUIPSendMessage() {
 // Reset the read cursor to the start of the current segment.
 // Set the flush flag to discard any further characters until the next END character is received.
 // Until then the main loop hopefully has processed the data in the buffer, and space is available.
-static void inline enterFlushMode () {
+static inline void enterFlushMode () {
 	// Reset the current segment, and enter flush mode
 	recvFlushMsg = true;
 	recvSegmentCursor = 0;
 
 }
+
+/// From main.c
+extern bool mainLoopMustRun;
 
 ISR(USART0_RX_vect) {
 	
@@ -575,7 +579,8 @@ ISR(USART0_RX_vect) {
 							recvCurrSegment = NULL;
 							setNewRecvSegment();
 							
-							recvDataPresent = true;
+							slipBufferReceived = true;
+							mainLoopMustRun = true;
 							
 						} // if (recvCurrMsgLen > 0)
 					} else { // if (recvChar == SLIP_END)

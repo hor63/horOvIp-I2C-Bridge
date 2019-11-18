@@ -35,10 +35,15 @@
 #ifndef __UIP_APP_IP2I2C_H__
 #define __UIP_APP_IP2I2C_H__
 
+#include <stdbool.h>
+
 void ip_i2c_bridge_appcall();
 
 typedef struct ip_i2c_bridge_state {
-	uint8_t state;
+	uint8_t sensorTime0;
+	uint8_t sensorTime1;
+	uint8_t sensorTime2;
+	bool sendDataPending;
 	} uip_tcp_appstate_t;
 /* UIP_APPCALL: the name of the application function. This function
    must return void and take no arguments (i.e., C type "void

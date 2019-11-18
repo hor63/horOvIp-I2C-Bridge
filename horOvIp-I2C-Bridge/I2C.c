@@ -5,6 +5,7 @@
  *  Author: kai_horstmann
  */ 
 
+
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <avr/sleep.h>
@@ -23,7 +24,7 @@
 // Use 15 instead 16 to round the register value
 #define TWI_BIT_RATE_REG_VAL ((F_CPU/I2C_CLOCK_FREQ-15)/2)
 
-
+static bool I2CTransferFinished = false;
 
 /** 
  * Create the address/R_W byte on the I2C bus.
@@ -206,15 +207,25 @@ static bool transferActive = false;
 /// The the final result of a transfer. Can be set in between, even if cleanup is being send (i.e. STOP)
 static enum I2CTransferResult transferResult = I2C_RC_UNDEF;
 /// The status code of the I2C hardware when transferResult is not I2C_RC_OK.
+/// Refer to the [ATMega1284P datasheet](http://ww1.microchip.com/downloads/en/DeviceDoc/ATmega164A_PA-324A_PA-644A_PA-1284_P_Data-Sheet-40002070A.pdf),
+/// tables 21-3, pg. 224 and 21-4, pg. 227
 static uint8_t i2cHWStatusCode = 0;
-// The sequence status when an error occurred.
-static enum I2CStatus errSeqStatus = STAT_IDLE;
-	
 
-void I2CStartTransferSend (uint8_t slAddr, uint8_t *data, uint8_t dataLen) {
+/// The sequence status when an error occurred.
+static enum I2CStatus errSeqStatus = STAT_IDLE;
+
+/// Callback to the initiator of one of the I2CStartTransfer... calls with the result of the transfer
+static I2CTransferFinishedCallbPtr transferFinishedCallback = NULL;
+
+void I2CStartTransferSend (
+		uint8_t slAddr,
+		uint8_t *data,
+		uint8_t dataLen,
+		I2CTransferFinishedCallbPtr callback) {
 	
 	while (transferActive) {
-		__asm__ __volatile__ ("nop" ::: "memory");
+		// Force a memory barrier to re-read transferActive
+		__asm__ __volatile__ ("/*nop*/" ::: "memory");
 	}
 
 	currSequence = sequenceSendBytes;
@@ -232,8 +243,10 @@ void I2CStartTransferSend (uint8_t slAddr, uint8_t *data, uint8_t dataLen) {
 	/// The status code of the I2C hardware when transferResult is not I2C_RC_OK.
 	i2cHWStatusCode = 0;
 	errSeqStatus = STAT_IDLE;
+	transferFinishedCallback = callback;
 
-	__asm__ __volatile__ ("nop" ::: "memory");
+	// Force a memory barrier to flush all variables to memory
+	__asm__ __volatile__ ("/*nop*/" ::: "memory");
 	// Activate I2C, activate the interrupt, occupy the bus, and send START
 	TWCR = 0
 	| _BV(TWINT)
@@ -250,10 +263,12 @@ void I2CStartTransferSend (uint8_t slAddr, uint8_t *data, uint8_t dataLen) {
 void I2CStartTransferSendReceive (
 	uint8_t slAddr, 
 	uint8_t *sendData,uint8_t sendDataLen,
-	uint8_t *recvData,uint8_t recvDataLen) {
+	uint8_t *recvData,uint8_t recvDataLen,
+	I2CTransferFinishedCallbPtr callback) {
 	
 	while (transferActive) {
-		__asm__ __volatile__ ("nop" ::: "memory");
+		// Force a memory barrier to re-read transferActive
+		__asm__ __volatile__ ("/*nop*/" ::: "memory");
 	}
 
 	currSequence = sequenceReceiveBytesWithRegisterAdress;
@@ -273,8 +288,10 @@ void I2CStartTransferSendReceive (
 	/// The status code of the I2C hardware when transferResult is not I2C_RC_OK.
 	i2cHWStatusCode = 0;
 	errSeqStatus = STAT_IDLE;
+	transferFinishedCallback = callback;
 
-	__asm__ __volatile__ ("nop" ::: "memory");
+	// Force a memory barrier to flush all variables to memory
+	__asm__ __volatile__ ("/*nop*/" ::: "memory");
 	// Activate I2C, activate the interrupt, occupy the bus, and send START
 	TWCR = 0
 	| _BV(TWINT)
@@ -288,10 +305,15 @@ void I2CStartTransferSendReceive (
 	
 }
 
-void I2CStartTransferReceive (uint8_t slAddr, uint8_t *data, uint8_t dataLen) {
+void I2CStartTransferReceive (
+		uint8_t slAddr,
+		uint8_t *data,
+		uint8_t dataLen,
+		I2CTransferFinishedCallbPtr callback) {
 	
 	while (transferActive) {
-		__asm__ __volatile__ ("nop" ::: "memory");
+		// Force a memory barrier to re-read transferActive
+		__asm__ __volatile__ ("/*nop*/" ::: "memory");
 	}
 
 	currSequence = sequenceReceiveBytes;
@@ -307,8 +329,10 @@ void I2CStartTransferReceive (uint8_t slAddr, uint8_t *data, uint8_t dataLen) {
 	/// The status code of the I2C hardware when transferResult is not I2C_RC_OK.
 	i2cHWStatusCode = 0;
 	errSeqStatus = STAT_IDLE;
+	transferFinishedCallback = callback;
 
-	__asm__ __volatile__ ("nop" ::: "memory");
+	// Force a memory barrier to flush all variables to memory
+	__asm__ __volatile__ ("/*nop*/" ::: "memory");
 	// Activate I2C, activate the interrupt, occupy the bus, and send START
 	TWCR = 0
 	| _BV(TWINT)
@@ -331,9 +355,8 @@ enum I2CTransferResult I2CWaitGetTransferResult(
 		sleep_enable();
 		sei();
 		sleep_cpu();
-		sleep_disable();
 		cli();
-		__asm__ __volatile__ ("nop" ::: "memory");
+		sleep_disable();
 	}
 	sei();
 	
@@ -346,6 +369,24 @@ bool I2CIsTransferActive() {
 	return transferActive;
 }
 
+
+void I2CPoll() {
+	if (!transferActive && transferFinishedCallback != NULL) {
+		// Evil trap: Before I called the callback and then set the callback pointer NULL.
+		// But within the callback I started the next transfer, and set another callback.
+		// But setting the callback NULL at the end clobbered the defined callback :(
+		I2CTransferFinishedCallbPtr tmpCallback = transferFinishedCallback;
+		transferFinishedCallback = NULL;
+		tmpCallback (
+				transferResult,
+				i2cHWStatusCode,
+				errSeqStatus
+				);
+	}
+}
+
+/// From main.c
+extern volatile bool mainLoopMustRun;
 
 /// Interrupt handler 
 ISR(TWI_vect){
@@ -368,7 +409,7 @@ ISR(TWI_vect){
 		
 		currRecvIndex++;
 	}
-	
+
 	// Read the HW status register.
 	// Mask out the lower two bits as these are the prescaler.
 	actualHWStatus = TWSR & ~0b11;
@@ -521,6 +562,8 @@ ISR(TWI_vect){
 			;
 
 			transferActive = false;
+			I2CTransferFinished = true;
+			mainLoopMustRun = true;
 
 			break;
 
@@ -530,3 +573,4 @@ ISR(TWI_vect){
 	currSequenceStatus = &(currSequence[currStatusIndex]);
 	
 }
+

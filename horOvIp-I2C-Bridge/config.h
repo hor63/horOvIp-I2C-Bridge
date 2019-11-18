@@ -15,11 +15,27 @@
  */
 #define F_CPU 9216000UL
 
-/** \brief uIP priodic poll frequency times 2 in Hz
+/** \brief The address of the BMX160 I2C on the I2C bus
+ *
+ */
+#define BMX160ADDR 0x68
+
+/** \brief The data rate of BMX160 in Hz
+ *
+ * This is the data rate at which data are captured within the BMX160.
+ * It is also the timer rate, and the rate at which the application reads
+ * data from the BMX160, and sends them to the vario.
+ *
+ * Allowed values are 100, 50, 25
+ *
+ */
+#define BMX160ODR 50
+
+/** \brief uIP periodic poll frequency in Hz
  *
  * The poll timer fires at twice the poll frequency because it also serves as blink frequency at double the frequency.
  */
-#define UIP_PERIODIC_POLL_FREQUENCY_4 8
+#define UIP_PERIODIC_POLL_FREQUENCY 4
 
 /** 
  * Buffer size for the SLIP receive and send buffers as well as the uIP buffer
@@ -49,7 +65,7 @@
  *
  * Please note that the other serial parameters are fixed by the SLIP standard to 8,n,1
  */
-#define SLIP_BAUD_RATE 9600UL
+#define SLIP_BAUD_RATE 115200UL
 
 /**
  * Baud rate of the debugging port

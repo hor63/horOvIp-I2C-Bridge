@@ -6,11 +6,15 @@
  */ 
 
 
-#include <avr/io.h>
-#include "uip.h"
-
 #ifndef SLIP_USART_H_
 #define SLIP_USART_H_
+
+#include <avr/io.h>
+#include <stdbool.h>
+
+#include "uip.h"
+
+extern bool slipBufferReceived;
 
 /// \brief Initialize the buffers and management variables.
 void slipInit();

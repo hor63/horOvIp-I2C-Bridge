@@ -26,7 +26,7 @@
     <OverrideVtorValue>exception_table</OverrideVtorValue>
     <BootSegment>2</BootSegment>
     <ResetRule>0</ResetRule>
-    <eraseonlaunchrule>0</eraseonlaunchrule>
+    <eraseonlaunchrule>2</eraseonlaunchrule>
     <EraseKey />
     <AsfFrameworkConfig>
       <framework-data xmlns="">
@@ -171,6 +171,12 @@
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="BMX160.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="BMX160defs.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="BMX160net.h">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="config.h">

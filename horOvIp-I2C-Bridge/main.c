@@ -18,8 +18,38 @@
 #include "BMX160.h"
 #include "serDebugOut.h"
 
-int main(void) {
+volatile bool mainLoopMustRun = false;
+
+static void uipTimerCallb (uint8_t numTicks) {
+	// Round the number of ticks
+	static const uint8_t numTicksUipPeriodic = BMX160ODR / UIP_PERIODIC_POLL_FREQUENCY;
+	static uint8_t lastNumTicks = 0;
+
+	uint8_t numTicsElapsed;
 	uint8_t i;
+
+	if (numTicks > lastNumTicks) {
+		numTicsElapsed = numTicks - lastNumTicks;
+	} else {
+		numTicsElapsed = UINT8_MAX - lastNumTicks + numTicks;
+	}
+	lastNumTicks = numTicks;
+
+	if (numTicsElapsed > numTicksUipPeriodic) {
+		for(i = 0; i < UIP_CONNS; ++i) {
+			uip_periodic(i);
+			if(uip_len > 0) {
+				slipQueueUIPSendMessage();
+			}
+		}
+	}
+
+}
+
+static struct TimerTickCallbChain uipTimerCallChainItem;
+
+
+int main(void) {
 	
 	// Set all ports as input
 	// Activate the pull-ups to avoid free floating inputs
@@ -44,12 +74,15 @@ int main(void) {
 	slipInit();
 	
 	{
+		// Define MAKE_IP_ADDRESS here. It is called in the IP address macros is BMX160Net.h
+		// and is defined here just before it is used.
+#define MAKE_IP_ADDR(a,b,c,d) uip_ipaddr(&addr,a,b,c,d)
 		uip_ipaddr_t addr;
-		uip_ipaddr(&addr, 192,168,203,2);
+		MAKE_IP_ADDR_I2C_BRIDGE;
 		uip_sethostaddr(&addr);
-		uip_ipaddr(&addr, 192,255,255,0);
+		MAKE_IP_NETMASK_I2C_BRIDGE;
 		uip_setnetmask(&addr);
-		uip_ipaddr(&addr, 192,168,203,1);
+		MAKE_IP_PEER_ADDR_I2C_BRIDGE;
 		uip_setdraddr(&addr);
 	}
 	uip_listen(HTONS(19463));
@@ -60,28 +93,37 @@ int main(void) {
 	// Let other components start up safely, e.g. the IMU
 	_delay_ms(500);
 
+	BMX160Init();
+
 	slipStart();
 
-	timersStart();
+	BMX160StartDataCapturing();
+
+	timerStart();
+
+	uipTimerCallChainItem.callbFunc = uipTimerCallb;
+	uipTimerCallChainItem.next = NULL;
+	timerAddCallback(&uipTimerCallChainItem);
 
 	DEBUG_OUT("STARTUP done\n");
 
-	BMX160Test();
-	
-    while (1) {
-		
-		slipProcessReadBuffer();
-		
-		if (timerTicksElapsed > 3) {
-			timerTicksElapsed = 0;
-			for(i = 0; i < UIP_CONNS; ++i) {
-				uip_periodic(i);
-				if(uip_len > 0) {
-					slipQueueUIPSendMessage();
-				}
-			}
 
-		} else {
+    while (1) {
+    	uint8_t i;
+
+//		cli();
+
+//		if (mainLoopMustRun) {
+			// I am running the main loop body. So reset the flag.
+			// It may be set by an interrupt handler or application code called here.
+			mainLoopMustRun = false;
+
+			sei();
+
+			timerPoll();
+			I2CPoll();
+			slipProcessReadBuffer();
+
 			// Polling the connections without timer processing.
 			for(i = 0; i < UIP_CONNS; ++i) {
 				uip_poll_conn((&(uip_conns [i])));
@@ -89,28 +131,93 @@ int main(void) {
 					slipQueueUIPSendMessage();
 				}
 			}
-		}
-			
-		
-		cli();
-		sleep_enable();
-		sei();
-		sleep_cpu();
-		sleep_disable();
-    }
-	
+//		} else {
+//			sei();
+//		}
 
-	
+		cli();
+		if (!mainLoopMustRun) {
+			sleep_enable();
+			sei();
+			sleep_cpu();
+			sleep_disable();
+		} else {
+			mainLoopMustRun = false;
+			sei();
+		}
+    }
+
 }
 
-void ip_i2c_bridge_appcall() {
 
-	if(uip_connected()) {
-		uip_send("Welcome to horOV IMU board\n",27);
+
+void ip_i2c_bridge_appcall() {
+	struct BMX160Data* bmx160Data = BMX160GetData();
+	bool sendBMXData = false;
+
+/*
+	uip_newdata()
+	uip_poll()
+
+	uip_mss()
+
+*/
+
+	if (uip_closed() || uip_aborted()) {
+		return;
 	}
 
-	if(uip_newdata() || uip_rexmit()) {
-		uip_send("OK\n", 3);
+	if (uip_timedout()) {
+		uip_close();
+		return;
+	}
+
+	if(uip_connected()) {
+		uip_conn->appstate.sensorTime0 = 0;
+		uip_conn->appstate.sensorTime1 = 0;
+		uip_conn->appstate.sensorTime2 = 0;
+
+		BMX160ReadTrimRegisters();
+		uip_send(bmx160Data,sizeof (struct BMX160Data));
+		uip_conn->appstate.sendDataPending = true;
+
+		mainLoopMustRun = true;
+		return;
+	}
+
+	if(uip_newdata()) {
+		;
+	}
+
+	if (uip_acked()) {
+		uip_conn->appstate.sendDataPending = false;
+	}
+
+	if (uip_rexmit()) {
+		if (uip_mss() >= sizeof (struct BMX160Data)) {
+			sendBMXData = true;
+		}
+	} else {
+		if (!uip_conn->appstate.sendDataPending) {
+			if (BMX160IsDataValid() &&
+				bmx160Data->header.unionCode != BMX160DATA_TRIM && (
+					bmx160Data->header.sensorTime0 != uip_conn->appstate.sensorTime0 ||
+					bmx160Data->header.sensorTime1 != uip_conn->appstate.sensorTime1 ||
+					bmx160Data->header.sensorTime2 != uip_conn->appstate.sensorTime2
+					) &&
+					uip_mss() >= bmx160Data->header.length) {
+				sendBMXData = true;
+			}
+		}
+	}
+
+	if (sendBMXData) {
+		uip_conn->appstate.sensorTime0 = bmx160Data->header.sensorTime0;
+		uip_conn->appstate.sensorTime1 = bmx160Data->header.sensorTime1;
+		uip_conn->appstate.sensorTime2 = bmx160Data->header.sensorTime2;
+		uip_send(bmx160Data,bmx160Data->header.length);
+
+		uip_conn->appstate.sendDataPending = true;
 	}
 	
 }
