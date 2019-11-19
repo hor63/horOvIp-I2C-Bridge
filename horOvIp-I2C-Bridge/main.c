@@ -111,14 +111,11 @@ int main(void) {
     while (1) {
     	uint8_t i;
 
-//		cli();
 
-//		if (mainLoopMustRun) {
+		if (mainLoopMustRun) {
 			// I am running the main loop body. So reset the flag.
 			// It may be set by an interrupt handler or application code called here.
 			mainLoopMustRun = false;
-
-			sei();
 
 			timerPoll();
 			I2CPoll();
@@ -131,9 +128,7 @@ int main(void) {
 					slipQueueUIPSendMessage();
 				}
 			}
-//		} else {
-//			sei();
-//		}
+		}
 
 		cli();
 		if (!mainLoopMustRun) {
@@ -142,7 +137,6 @@ int main(void) {
 			sleep_cpu();
 			sleep_disable();
 		} else {
-			mainLoopMustRun = false;
 			sei();
 		}
     }
