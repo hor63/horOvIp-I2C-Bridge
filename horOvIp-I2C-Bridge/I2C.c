@@ -228,6 +228,9 @@ void I2CStartTransferSend (
 		__asm__ __volatile__ ("/*nop*/" ::: "memory");
 	}
 
+	// Cleanly finish any pending previous calls
+	I2CPoll();
+
 	currSequence = sequenceSendBytes;
 	currStatusIndex = STAT_START_SENT;
 	currSequenceStatus = &(currSequence[currStatusIndex]);
@@ -270,6 +273,9 @@ void I2CStartTransferSendReceive (
 		// Force a memory barrier to re-read transferActive
 		__asm__ __volatile__ ("/*nop*/" ::: "memory");
 	}
+
+	// Cleanly finish any pending previous calls
+	I2CPoll();
 
 	currSequence = sequenceReceiveBytesWithRegisterAdress;
 	currStatusIndex = STAT_START_SENT;
@@ -315,6 +321,9 @@ void I2CStartTransferReceive (
 		// Force a memory barrier to re-read transferActive
 		__asm__ __volatile__ ("/*nop*/" ::: "memory");
 	}
+
+	// Cleanly finish any pending previous calls
+	I2CPoll();
 
 	currSequence = sequenceReceiveBytes;
 	currStatusIndex = STAT_START_SENT;
@@ -372,9 +381,15 @@ bool I2CIsTransferActive() {
 
 void I2CPoll() {
 	if (!transferActive && transferFinishedCallback != NULL) {
-		// Evil trap: Before I called the callback and then set the callback pointer NULL.
-		// But within the callback I started the next transfer, and set another callback.
-		// But setting the callback NULL at the end clobbered the defined callback :(
+		/*
+		 * Evil trap: Previously I called the callback and then set the callback pointer NULL.
+		 * But within the callback I started the next transfer, and set another callback.
+		 * But setting the callback NULL at the end clobbered the defined callback :(
+		 *
+		 * Equally important is to set transferFinishedCallback = NULL before the callback.
+		 * I2CPoll is called by the transfer functions first. This may lead to an endless recursion
+		 * if the callback pointer is still set
+		 */
 		I2CTransferFinishedCallbPtr tmpCallback = transferFinishedCallback;
 		transferFinishedCallback = NULL;
 		tmpCallback (
