@@ -15,9 +15,11 @@
 
 #include "serDebugOut.h"
 
+/// From main.c
+extern volatile bool mainLoopMustRun;
+
 /// \brief Indicator for the main loop that a package is waiting in the receive buffer
 bool slipBufferReceived = false;
-
 
 /// The term "(F_CPU + SLIP_BAUD_RATE*8)" rounds the UBRR value to the next integer 
 #define USART_BAUD_CONFIG_VAL (((F_CPU + SLIP_BAUD_RATE*8)/(16*SLIP_BAUD_RATE))-1)
@@ -398,6 +400,9 @@ void slipProcessReadBuffer() {
 			slipQueueUIPSendMessage();
 		}
 
+		// Force the main loop to run again.
+		mainLoopMustRun = true;
+
 		cli();
 
 		recvFirstSegmentIndex = currSegment->header.nextMsgIndex;
@@ -518,8 +523,6 @@ static inline void enterFlushMode () {
 
 }
 
-/// From main.c
-extern bool mainLoopMustRun;
 
 ISR(USART0_RX_vect) {
 	
