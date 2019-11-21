@@ -149,7 +149,32 @@ static void readMagRegisters(uint8_t *buf,uint8_t reg,uint8_t len) {
 	
 }
 
+static void resetSensor() {
 
+	// Send the soft reset command
+	do {
+		dataBuf[0] = BMX160_CMD_REG;
+		dataBuf[1] = BMX160_CMD_SOFT_RESET;
+		I2CStartTransferSend(BMX160ADDR,dataBuf,2,NULL);
+		waitI2CTransfer("Soft reset BMX160");
+		_delay_ms(BMX160_CMD_RESET_WAIT_TIME);
+
+		// read out the error register
+		dataBuf[0] = BMX160_ERR_REG;
+		I2CStartTransferSendReceive (
+		BMX160ADDR,
+		dataBuf,2,
+		dataBuf,1,
+		NULL);
+		waitI2CTransfer("Read Error register");
+	} while (dataBuf[0] & BMX160_ERR_DROP_CMD_ERR_BIT);
+
+	DEBUG_OUT ("Soft reset");
+	DEBUG_OUT (". Last error code = ");
+	DEBUG_UINT_HEX_OUT(dataBuf[0]);
+	DEBUG_CHR_OUT('\n');
+
+}
 
 static void powerAllSensorsOn() {
 	
@@ -169,7 +194,7 @@ static void powerAllSensorsOn() {
 		dataBuf,1,
 		NULL);
 		waitI2CTransfer("Read Error register");
-	} while (0); // (dataBuf[0] & BMX160_ERR_DROP_CMD_ERR_BIT);
+	} while (dataBuf[0] & BMX160_ERR_DROP_CMD_ERR_BIT);
 
 	DEBUG_OUT ("Accel");
 	DEBUG_OUT (" up. Last error code = ");
@@ -192,7 +217,7 @@ static void powerAllSensorsOn() {
 		dataBuf,1,
 		NULL);
 		waitI2CTransfer("Read Error register");
-	} while (0); // (dataBuf[0] & BMX160_ERR_DROP_CMD_ERR_BIT);
+	} while (dataBuf[0] & BMX160_ERR_DROP_CMD_ERR_BIT);
 	
 	DEBUG_OUT ("Gyro");
 	DEBUG_OUT (" up. Last error code = ");
@@ -216,7 +241,7 @@ static void powerAllSensorsOn() {
 		dataBuf,1,
 		NULL);
 		waitI2CTransfer("Read Error register");
-	} while (0); // (dataBuf[0] & BMX160_ERR_DROP_CMD_ERR_BIT);
+	} while (dataBuf[0] & BMX160_ERR_DROP_CMD_ERR_BIT);
 
 	DEBUG_OUT ("Mag interface");
 	DEBUG_OUT (" up. Last error code = ");
@@ -427,6 +452,7 @@ static void readSensorDataWOMagCallb (
 	transferRunning = false;
 	mainLoopMustRun = true;
 
+/*
 	DEBUG_OUT("Sensor data no Mag, len = ");
 	DEBUG_UINT_OUT(bmx160Data.header.length);
 	DEBUG_OUT(", AccX = ");
@@ -434,6 +460,7 @@ static void readSensorDataWOMagCallb (
 	DEBUG_OUT(", GyrX = ");
 	DEBUG_INT_OUT(bmx160Data.accGyrData.gyrX);
 	DEBUG_CHR_OUT('\n');
+*/
 
 }
 
@@ -465,6 +492,7 @@ static void readSensorDataWithMagCallb (
 	transferRunning = false;
 	mainLoopMustRun = true;
 
+/*
 	DEBUG_OUT("Sensor data with Mag, len = ");
 	DEBUG_UINT_OUT(bmx160Data.header.length);
 	DEBUG_OUT(", AccX = ");
@@ -474,6 +502,7 @@ static void readSensorDataWithMagCallb (
 	DEBUG_OUT(", MagX = ");
 	DEBUG_INT_OUT(bmx160Data.accGyrMagData.magX);
 	DEBUG_CHR_OUT('\n');
+*/
 }
 
 static void readStatusRegForSensorData();
@@ -493,9 +522,11 @@ static void readStatusRegForSensorDataCallb (
 		if ((dataBuf[0] & (1<<BMX160_STATUS_DRDY_ACC | 1<<BMX160_STATUS_DRDY_GYR)) == (1<<BMX160_STATUS_DRDY_ACC | 1<<BMX160_STATUS_DRDY_GYR)) {
 			// At least Gyro and and Accel data are there.
 
+/*
 			DEBUG_OUT("New data present. Number status reads = ");
 			DEBUG_UINT_OUT(numReadStatus);
 			DEBUG_CHR_OUT('\n');
+*/
 			numReadStatus = 1;
 
 			// Rewind the timer because it runs intentionally a bit faster than the sensor cycle.
@@ -591,6 +622,8 @@ static void timerTickOccurred (uint8_t numTicks){
 
 void BMX160Init() {
 
+	resetSensor();
+
 	powerAllSensorsOn();
 
 	readTrimRegistersRawValues();
@@ -631,6 +664,11 @@ void BMX160ReadTrimRegisters()
 	bmx160Data.header.sensorTime1 = 0;
 	bmx160Data.header.sensorTime2 = 0;
 	bmx160Data.header.length = sizeof(bmx160Data.header) + sizeof(bmx160Data.trimData);
+
+	// Use the content of bmx160Data containing the trim data immediately.
+	// Until the next measurement cycle passes consider the data invalid as measurement data, and
+	// prevent sending the trim data as cyclic data.
+	dataValid = false;
 
 }
 
