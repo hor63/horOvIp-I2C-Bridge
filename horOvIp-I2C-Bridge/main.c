@@ -25,13 +25,13 @@ static void uipTimerCallb (uint8_t numTicks) {
 	static const uint8_t numTicksUipPeriodic = BMX160ODR / UIP_PERIODIC_POLL_FREQUENCY;
 	static uint8_t lastNumTicks = 0;
 
-	uint8_t numTicsElapsed;
+	static uint8_t numTicsElapsed = 0;
 	uint8_t i;
 
 	if (numTicks > lastNumTicks) {
-		numTicsElapsed = numTicks - lastNumTicks;
+		numTicsElapsed += numTicks - lastNumTicks;
 	} else {
-		numTicsElapsed = UINT8_MAX - lastNumTicks + numTicks;
+		numTicsElapsed += UINT8_MAX - lastNumTicks + numTicks;
 	}
 	lastNumTicks = numTicks;
 
@@ -42,6 +42,7 @@ static void uipTimerCallb (uint8_t numTicks) {
 				slipQueueUIPSendMessage();
 			}
 		}
+		numTicsElapsed = 0;
 	}
 
 }
@@ -158,11 +159,13 @@ void ip_i2c_bridge_appcall() {
 */
 
 	if (uip_closed() || uip_aborted()) {
+		uip_conn->appstate.sendDataPending = false;
 		return;
 	}
 
 	if (uip_timedout()) {
 		uip_close();
+		uip_conn->appstate.sendDataPending = false;
 		return;
 	}
 
@@ -172,7 +175,7 @@ void ip_i2c_bridge_appcall() {
 		uip_conn->appstate.sensorTime2 = 0;
 
 		BMX160ReadTrimRegisters();
-		uip_send(bmx160Data,sizeof (struct BMX160Data));
+		uip_send(bmx160Data,bmx160Data->header.length);
 		uip_conn->appstate.sendDataPending = true;
 
 		mainLoopMustRun = true;
