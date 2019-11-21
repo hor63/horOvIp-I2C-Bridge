@@ -69,9 +69,9 @@ void timerStart() {
 uint16_t timeCompareValue;
 
 	// 64 is the pre-scaler value for the counter
-	// Let the timer run out 2 ms earlier. I am waiting the remainder actively for the data to become available.
+	// Let the timer run out 1 ms earlier. I am waiting the remainder actively for the data to become available.
 	// Thus I am re-synchronizing with the sensor cycle each time.
-	timeCompareValue = F_CPU / (1/((1.0/BMX160ODR) - 0.002)) / 64;
+	timeCompareValue = F_CPU / (1/((1.0/BMX160ODR) - 0.001)) / 64;
 	
 	// Set the compare value
 	OCR1A = timeCompareValue;
@@ -96,7 +96,7 @@ void timerReset() {
 ISR(TIMER1_COMPA_vect) {
 	
 	// Blinky
-	DDRB = ((DDRB & (_BV(DDB2)|_BV(DDB3))) + _BV(DDB2)) & (_BV(DDB2)|_BV(DDB3));
+	// DDRB = ((DDRB & (_BV(DDB2)|_BV(DDB3))) + _BV(DDB2)) & (_BV(DDB2)|_BV(DDB3));
 	
 	timerTicksElapsed++;
 	timerTickOccurred = true;
