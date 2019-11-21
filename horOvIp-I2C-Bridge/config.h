@@ -33,7 +33,6 @@
 
 /** \brief uIP periodic poll frequency in Hz
  *
- * The poll timer fires at twice the poll frequency because it also serves as blink frequency at double the frequency.
  */
 #define UIP_PERIODIC_POLL_FREQUENCY 4
 
@@ -66,6 +65,7 @@
  * Please note that the other serial parameters are fixed by the SLIP standard to 8,n,1
  */
 #define SLIP_BAUD_RATE 115200UL
+// #define SLIP_BAUD_RATE 19200UL
 
 /**
  * Baud rate of the debugging port
