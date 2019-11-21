@@ -190,6 +190,8 @@
 #define BMX160_CMD_SOFT_RESET 0xb6
 #define BMX160_CMD_STEP_COUNTER_CLR 0xb2
 
+#define BMX160_CMD_RESET_WAIT_TIME 100
+
 
 // The data registers
 #define BMX160_DATA_REG 0x04
@@ -217,8 +219,8 @@
 #define BMX160_SENSORTIME_REG 0x18
 // The 3 bytes are in little-endian order.
 #define BMX160_SENSORTIME_BYTE_0 0x00
-#define BMX160_SENSORTIME_BYTE_1 0x00
-#define BMX160_SENSORTIME_BYTE_2 0x00
+#define BMX160_SENSORTIME_BYTE_1 0x01
+#define BMX160_SENSORTIME_BYTE_2 0x02
 
 #define BMX160_STATUS_REG 0x1b
 // Bits in the register
