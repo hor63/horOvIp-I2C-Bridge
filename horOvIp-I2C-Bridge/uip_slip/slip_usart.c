@@ -185,7 +185,7 @@ static bool recvEscReceived = false;
 #define SLIP_END ((uint8_t)0300)
 /// SLIP Escaped ESC character. Is sent in a sequence with SLIP_ESC when an ESC character is in the user data
 /// \see [RFC 1055](https://tools.ietf.org/html/rfc1055)
-#define SLIP_ESC_ESC ((uint8_t)335)
+#define SLIP_ESC_ESC ((uint8_t)0335)
 /// SLIP Escaped END character. Is sent in a sequence with SLIP_ESC when an END character is in the user data
 /// \see [RFC 1055](https://tools.ietf.org/html/rfc1055)
 #define SLIP_ESC_END ((uint8_t)0334)
@@ -386,10 +386,11 @@ void slipProcessReadBuffer() {
 
 		currSegment = (TRecvBufferSegment*)(recvBuffer + recvFirstSegmentIndex);
 
+/*
 		DEBUG_OUT("Received segment, len= ");
 		DEBUG_UINT_OUT(currSegment->header.dataLen);
 		DEBUG_CHR_OUT('\n');
-
+*/
 		memcpy(uip_buf,currSegment->data,currSegment->header.dataLen);
 			
 		// Process the message by uIP.
@@ -539,6 +540,8 @@ ISR(USART0_RX_vect) {
 			if (recvChar == SLIP_END) {
 				// Stop flushing when an END character is received.
 				recvFlushMsg = false;
+				mainLoopMustRun = true;
+				DEBUG_OUT("Leave flush mode.\n");
 			}
 		} else { // if (recvFlushMsg )
 			// Normal receive mode
@@ -547,6 +550,11 @@ ISR(USART0_RX_vect) {
 			if (!recvCurrSegment  // No receiver segment available because the buffer is full. 
 				|| (statusRegA & (_BV(FE0)|_BV(DOR0)|_BV(UPE0))) // Framing Error, buffer overrun, parity error
 				) {
+				if (!recvCurrSegment) {
+					DEBUG_OUT("Flush Mode because no recv segment present.\n");
+				} else {
+					DEBUG_OUT("Flush Mode Ser hardware error.\n");
+				}
 				enterFlushMode();	
 			} else { // Various error conditions
 				// No error conditions
@@ -600,6 +608,7 @@ ISR(USART0_RX_vect) {
 								default:
 									// Something went wrong here.
 									enterFlushMode();
+									DEBUG_OUT ("Flush mode: Illegal masked character.\n");
 									goto nextCharFromFiFO;
 							} // switch (recvChar)
 						} // if (recvEscReceived)
@@ -607,6 +616,7 @@ ISR(USART0_RX_vect) {
 						// Check if the cursor is over the limit (it was incremented which the previous received byte.
 						if (recvSegmentCursor >= IP_BUFFER_SIZE) {
 							enterFlushMode();
+							DEBUG_OUT ("Flush mode: Received segment too long.\n");
 							goto nextCharFromFiFO;
 						}
 						
