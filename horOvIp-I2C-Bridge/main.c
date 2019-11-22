@@ -91,10 +91,13 @@ int main(void) {
 	// Start interrupts here
 	sei();
 
-	// Let other components start up safely, e.g. the IMU
+	// Let other components start up safely, particularly the IMU but also other sensors
 	_delay_ms(500);
 
 	BMX160Init();
+
+	// Let the data capturing get into the swing
+	_delay_ms(200);
 
 	slipStart();
 
