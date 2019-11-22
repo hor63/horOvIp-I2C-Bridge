@@ -282,8 +282,8 @@ static void configGyro() {
 	waitI2CTransfer("Set gyro configuration");
 	_delay_ms(10);
 
-	dataBuf[0] = BMX160_ACC_RANGE_REG;
-	dataBuf[1] = BMX160_ACC_RANGE_4G;
+	dataBuf[0] = BMX160_GYR_RANGE_REG;
+	dataBuf[1] = BMX160_GYR_RANGE_250_D_S;
 	I2CStartTransferSend(BMX160ADDR,dataBuf,2,NULL);
 	waitI2CTransfer("Set gyro rate");
 	_delay_ms(10);
