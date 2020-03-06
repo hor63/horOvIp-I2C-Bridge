@@ -122,7 +122,7 @@ enum BMX160DataUnion {
 	BMX160DATA_ACC_GYR_MAG	= 3
 };
 
-/*** \brief Common communications structure for sending data from the micro controller to the application
+/** \brief Common communications structure for sending data from the micro controller to the application
  *
  */
 struct BMX160Data {
@@ -139,5 +139,32 @@ struct BMX160Data {
 		struct BMX160MeasDataAccGyrMag accGyrMagData;
 	};
 };
+
+/** \brief Encodes commands to the sensor board from the connected application
+ *
+ * Being used in \ref struct 
+ */
+enum BMX160RecvDataUnion {
+	/// Dummy message to speed up TCP reply to the board
+	BMX160RECV_DATA_NONE					= 1,
+	
+	/// Reset the IMU, re-read the magnetometer data,
+	/// send the magnetic trim data.
+	BMX160RECV_DATA_RESET_IMU				= 2,
+	
+	/// \brief Request magnetic trim data again.
+	BMX160RECV_DATA_RESEND_MAG_TRIM_DATA	= 3
+};
+
+struct BMX160RecvData {
+	struct {
+		uint8_t unionCode;
+		uint8_t filler;
+		uint16_t length;
+		} header;
+	union {
+		uint8_t dummy;
+		};
+	};
 
 #endif /* BMX160NET_H_ */

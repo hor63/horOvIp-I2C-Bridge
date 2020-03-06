@@ -17,7 +17,7 @@
 
 /** \brief Activates and configures the sensor
  *
- * This function runs synchnous
+ * This function runs synchronous
  *
  */
 void BMX160Init();

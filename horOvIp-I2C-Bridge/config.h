@@ -42,7 +42,7 @@
  * This is 100 bytes application data. The rest is IP and TCP headers.
  * \see UIP_CONF_BUFFER_SIZE
  */
-#define IP_BUFFER_SIZE 120
+#define IP_BUFFER_SIZE 220
 
 /** Number of SLIP receive buffers
  * Since the number of concurrent IP connections is 4 I provide 4 buffers

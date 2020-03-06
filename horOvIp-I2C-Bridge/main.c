@@ -92,7 +92,7 @@ int main(void) {
 	sei();
 
 	// Let other components start up safely, particularly the IMU but also other sensors
-	_delay_ms(500);
+	_delay_ms(1000);
 
 	BMX160Init();
 
@@ -147,6 +147,68 @@ int main(void) {
 
 }
 
+/** \brief process an incoming message on the TCP connection
+ *
+ * Only messages of type \ref struct BMX160RecvData are being expected
+ *
+ * @return true when the function put a message into the send buffer, i.e. the uip application callback must not send any other data.
+ */
+static bool processTCPMessage() {
+	bool rc = false;
+	
+	/*
+	uip_appdata pointer. The size of the data is
+	* available through the uip_len
+	*/
+	struct BMX160RecvData *recvData = (struct BMX160RecvData *)uip_appdata;
+	struct BMX160Data* bmxData;
+	
+	if (uip_len == recvData->header.length) {
+		// Seems legit
+		switch (recvData->header.unionCode) {
+			case BMX160RECV_DATA_RESET_IMU:
+			
+				// Stop the periodic data capturing temporarily
+				BMX160StopDataCapturing();
+
+				BMX160Init();
+				BMX160ReadTrimRegisters();
+				bmxData = BMX160GetData();				
+				
+				if (uip_mss() >= bmxData->header.length) {
+					uip_send (bmxData,bmxData->header.length);
+					rc = true;
+				}
+				
+				// restart the data capture
+				BMX160StartDataCapturing();
+				
+				break;
+			
+			case BMX160RECV_DATA_RESEND_MAG_TRIM_DATA:
+
+				// Stop the periodic data capturing temporarily
+				BMX160StopDataCapturing();
+				
+				BMX160ReadTrimRegisters();
+				bmxData = BMX160GetData();
+				
+				if (uip_mss() >= bmxData->header.length) {
+					uip_send (bmxData,bmxData->header.length);
+					rc = true;
+				}
+				
+				// restart the data capture
+				BMX160StartDataCapturing();
+			
+				break;
+			default:
+				break;
+		}
+	}
+	
+	return rc;
+}
 
 
 void ip_i2c_bridge_appcall() {
@@ -162,13 +224,13 @@ void ip_i2c_bridge_appcall() {
 */
 
 	if (uip_closed() || uip_aborted()) {
-		uip_conn->appstate.sendDataPending = false;
+		uip_conn->appstate.numSendPackagesPending = 0;
 		return;
 	}
 
 	if (uip_timedout()) {
 		uip_close();
-		uip_conn->appstate.sendDataPending = false;
+		uip_conn->appstate.numSendPackagesPending = 0;
 		return;
 	}
 
@@ -179,18 +241,21 @@ void ip_i2c_bridge_appcall() {
 
 		BMX160ReadTrimRegisters();
 		uip_send(bmx160Data,bmx160Data->header.length);
-		uip_conn->appstate.sendDataPending = true;
+		uip_conn->appstate.numSendPackagesPending = 1;
 
 		mainLoopMustRun = true;
 		return;
 	}
 
-	if(uip_newdata()) {
-		;
+	if (uip_acked()) {
+		(uip_conn->appstate.numSendPackagesPending)--;
 	}
 
-	if (uip_acked()) {
-		uip_conn->appstate.sendDataPending = false;
+	if(uip_newdata()) {
+		if (processTCPMessage()) {
+			mainLoopMustRun = true;
+			return;
+		}
 	}
 
 	if (uip_rexmit()) {
@@ -198,7 +263,6 @@ void ip_i2c_bridge_appcall() {
 			sendBMXData = true;
 		}
 	} else {
-		if (!uip_conn->appstate.sendDataPending) {
 			if (BMX160IsDataValid() &&
 				bmx160Data->header.unionCode != BMX160DATA_TRIM && (
 					bmx160Data->header.sensorTime0 != uip_conn->appstate.sensorTime0 ||
@@ -208,7 +272,6 @@ void ip_i2c_bridge_appcall() {
 					uip_mss() >= bmx160Data->header.length) {
 				sendBMXData = true;
 			}
-		}
 	}
 
 	if (sendBMXData) {
@@ -217,7 +280,9 @@ void ip_i2c_bridge_appcall() {
 		uip_conn->appstate.sensorTime2 = bmx160Data->header.sensorTime2;
 		uip_send(bmx160Data,bmx160Data->header.length);
 
-		uip_conn->appstate.sendDataPending = true;
+		uip_conn->appstate.numSendPackagesPending ++;
+		
+		mainLoopMustRun = true;
 	}
 	
 }

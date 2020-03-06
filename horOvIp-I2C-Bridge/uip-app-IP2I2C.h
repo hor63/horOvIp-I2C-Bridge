@@ -43,7 +43,7 @@ typedef struct ip_i2c_bridge_state {
 	uint8_t sensorTime0;
 	uint8_t sensorTime1;
 	uint8_t sensorTime2;
-	bool sendDataPending;
+	int8_t numSendPackagesPending;
 	} uip_tcp_appstate_t;
 /* UIP_APPCALL: the name of the application function. This function
    must return void and take no arguments (i.e., C type "void
