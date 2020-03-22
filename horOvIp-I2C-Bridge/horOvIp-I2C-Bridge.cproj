@@ -187,7 +187,34 @@
     <Compile Include="FreeRTOSConfig.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="FreeRTOS\FreeRTOS\Source\include\atomic.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="FreeRTOS\FreeRTOS\Source\include\event_groups.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="FreeRTOS\FreeRTOS\Source\include\FreeRTOS.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="FreeRTOS\FreeRTOS\Source\include\list.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="FreeRTOS\FreeRTOS\Source\include\portable.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="FreeRTOS\FreeRTOS\Source\include\projdefs.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="FreeRTOS\FreeRTOS\Source\include\queue.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="FreeRTOS\FreeRTOS\Source\include\semphr.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="FreeRTOS\FreeRTOS\Source\include\task.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="FreeRTOS\FreeRTOS\Source\include\timers.h">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="FreeRTOS\FreeRTOS\Source\list.c">

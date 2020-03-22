@@ -1,0 +1,6 @@
+eclipse.preferences.version=1
+environment/project/de.innot.avreclipse.toolchain.winavr.base.1382193447/PATH/delimiter=;
+environment/project/de.innot.avreclipse.toolchain.winavr.base.1382193447/PATH/operation=replace
+environment/project/de.innot.avreclipse.toolchain.winavr.base.1382193447/PATH/value=C\:\\Program Files (x86)\\Atmel\\Studio\\7.0\\toolchain\\avr8\\avr8-gnu-toolchain\\bin;C\:\\cygwin64\\bin
+environment/project/de.innot.avreclipse.toolchain.winavr.base.1382193447/append=true
+environment/project/de.innot.avreclipse.toolchain.winavr.base.1382193447/appendContributed=true

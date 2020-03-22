@@ -6,6 +6,7 @@
  */ 
 
 #include "config.h"
+#include <stdint.h>
 #include <avr/io.h>
 #include <avr/sleep.h>
 #include <avr/interrupt.h>
@@ -13,6 +14,7 @@
 
 #include "FreeRTOS.h"
 #include "task.h"
+#include "timers.h"
 
 #include "uip.h"
 #include "uip_slip/slip_usart.h"
@@ -51,7 +53,9 @@ static void uipTimerCallb (uint8_t numTicks) {
 }
 
 static struct TimerTickCallbChain uipTimerCallChainItem;
-
+static void vTestTask( void *pvParameters );
+static void vTestTimerFunction( TimerHandle_t xTimer );
+static TimerHandle_t testTimer;
 
 int main(void) {
 	
@@ -116,6 +120,14 @@ int main(void) {
 
 	// Enable sleep here. The idle hook will sleep the processor
 	sleep_enable();
+
+	xTaskCreate( vTestTask, "Test", configMINIMAL_STACK_SIZE, NULL, TASK_PRIO_APP, NULL );
+	testTimer = xTimerCreate("Blinky",33,pdTRUE,vTestTimerFunction,vTestTimerFunction);
+	xTimerStart(testTimer,10);
+
+	// Set the direction of the LED pin output
+	DDRB |= _BV(DDB2);
+
 	vTaskStartScheduler();
 
 
@@ -151,6 +163,29 @@ int main(void) {
 			sei();
 		}
     }
+
+}
+
+
+static void vTestTask( void *pvParameters ) {
+
+	// Set the direction of the LED pin output
+	DDRB |= _BV(DDB3);
+
+	for (;;) {
+		// Toggle the pin
+		PINB = _BV(PINB3);
+
+		// And wait 500ms
+		vTaskDelay(100);
+	}
+
+}
+
+static void vTestTimerFunction( TimerHandle_t xTimer ) {
+
+	// Toggle the pin
+	PINB = _BV(PINB2);
 
 }
 

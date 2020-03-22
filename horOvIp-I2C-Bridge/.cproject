@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<?fileVersion 4.0.0?><cproject storage_type_id="org.eclipse.cdt.core.XmlProjectDescriptionStorage">
+	<storageModule moduleId="org.eclipse.cdt.core.settings">
+		<cconfiguration id="de.innot.avreclipse.toolchain.winavr.base.1382193447">
+			<storageModule buildSystemId="org.eclipse.cdt.managedbuilder.core.configurationDataProvider" id="de.innot.avreclipse.toolchain.winavr.base.1382193447" moduleId="org.eclipse.cdt.core.settings" name="Default">
+				<externalSettings/>
+				<extensions>
+					<extension id="org.eclipse.cdt.core.ELF" point="org.eclipse.cdt.core.BinaryParser"/>
+					<extension id="org.eclipse.cdt.core.GASErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+					<extension id="org.eclipse.cdt.core.MakeErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+					<extension id="org.eclipse.cdt.core.GCCErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+				</extensions>
+			</storageModule>
+			<storageModule moduleId="cdtBuildSystem" version="4.0.0">
+				<configuration buildProperties="" description="" id="de.innot.avreclipse.toolchain.winavr.base.1382193447" name="Default" optionalBuildProperties="" parent="org.eclipse.cdt.build.core.emptycfg">
+					<folderInfo id="de.innot.avreclipse.toolchain.winavr.base.1382193447.888289265" name="/" resourcePath="">
+						<toolChain id="de.innot.avreclipse.toolchain.winavr.base.204228333" name="AVR-GCC Toolchain" superClass="de.innot.avreclipse.toolchain.winavr.base">
+							<option id="de.innot.avreclipse.toolchain.options.toolchain.objcopy.flash.1117197928" name="Generate HEX file for Flash memory" superClass="de.innot.avreclipse.toolchain.options.toolchain.objcopy.flash"/>
+							<option id="de.innot.avreclipse.toolchain.options.toolchain.objcopy.eeprom.1028805235" name="Generate HEX file for EEPROM" superClass="de.innot.avreclipse.toolchain.options.toolchain.objcopy.eeprom"/>
+							<option id="de.innot.avreclipse.toolchain.options.toolchain.objdump.871750210" name="Generate Extended Listing (Source + generated Assembler)" superClass="de.innot.avreclipse.toolchain.options.toolchain.objdump"/>
+							<option id="de.innot.avreclipse.toolchain.options.toolchain.size.788880219" name="Print Size" superClass="de.innot.avreclipse.toolchain.options.toolchain.size"/>
+							<option id="de.innot.avreclipse.toolchain.options.toolchain.avrdude.1182167198" name="AVRDude" superClass="de.innot.avreclipse.toolchain.options.toolchain.avrdude"/>
+							<targetPlatform archList="all" binaryParser="org.eclipse.cdt.core.ELF" id="de.innot.avreclipse.targetplatform.avr.1882820313" name="AVR Cross-Target" osList="all" superClass="de.innot.avreclipse.targetplatform.avr"/>
+							<builder id="de.innot.avreclipse.target.builder.winavr.base.1492659346" keepEnvironmentInBuildfile="false" managedBuildOn="false" name="AVR GNU Make Builder" superClass="de.innot.avreclipse.target.builder.winavr.base"/>
+							<tool id="de.innot.avreclipse.tool.assembler.winavr.base.389935950" name="AVR Assembler" superClass="de.innot.avreclipse.tool.assembler.winavr.base">
+								<inputType id="de.innot.avreclipse.tool.assembler.input.817614663" superClass="de.innot.avreclipse.tool.assembler.input"/>
+							</tool>
+							<tool id="de.innot.avreclipse.tool.compiler.winavr.base.321224120" name="AVR Compiler" superClass="de.innot.avreclipse.tool.compiler.winavr.base">
+								<inputType id="de.innot.avreclipse.compiler.winavr.input.1558052664" name="C Source Files" superClass="de.innot.avreclipse.compiler.winavr.input"/>
+							</tool>
+							<tool id="de.innot.avreclipse.tool.cppcompiler.base.1290931974" name="AVR C++ Compiler" superClass="de.innot.avreclipse.tool.cppcompiler.base"/>
+							<tool id="de.innot.avreclipse.tool.linker.winavr.base.830283313" name="AVR C Linker" superClass="de.innot.avreclipse.tool.linker.winavr.base"/>
+							<tool id="de.innot.avreclipse.tool.cpplinker.base.679330571" name="AVR C++ Linker" superClass="de.innot.avreclipse.tool.cpplinker.base"/>
+							<tool id="de.innot.avreclipse.tool.archiver.winavr.base.2136390431" name="AVR Archiver" superClass="de.innot.avreclipse.tool.archiver.winavr.base"/>
+						</toolChain>
+					</folderInfo>
+					<sourceEntries>
+						<entry excluding="Debug|Release|doxygen|uip/apps|uip/doc|uip/lib|uip/unix|FreeRTOS/FreeRTOS-Plus/|FreeRTOS/FreeRTOS/Demo/|FreeRTOS/FreeRTOS/License/|FreeRTOS/FreeRTOS/Source/portable/ARMClang/|FreeRTOS/FreeRTOS/Source/portable/ARMv8M/|FreeRTOS/FreeRTOS/Source/portable/BCC/|FreeRTOS/FreeRTOS/Source/portable/CCS/|FreeRTOS/FreeRTOS/Source/portable/CodeWarrior/|FreeRTOS/FreeRTOS/Source/portable/Common/|FreeRTOS/FreeRTOS/Source/portable/IAR/|FreeRTOS/FreeRTOS/Source/portable/Keil/|FreeRTOS/FreeRTOS/Source/portable/MikroC/|FreeRTOS/FreeRTOS/Source/portable/MPLAB/|FreeRTOS/FreeRTOS/Source/portable/MSVC-MingW/|FreeRTOS/FreeRTOS/Source/portable/oWatcom/|FreeRTOS/FreeRTOS/Source/portable/Paradigm/|FreeRTOS/FreeRTOS/Source/portable/Renesas/|FreeRTOS/FreeRTOS/Source/portable/Rowley/|FreeRTOS/FreeRTOS/Source/portable/RVDS/|FreeRTOS/FreeRTOS/Source/portable/SDCC/|FreeRTOS/FreeRTOS/Source/portable/Softune/|FreeRTOS/FreeRTOS/Source/portable/Tasking/|FreeRTOS/FreeRTOS/Source/portable/ThirdParty/|FreeRTOS/FreeRTOS/Source/portable/WizC/|FreeRTOS/FreeRTOS/Source/portable/GCC/ARM_CA53_64_BIT/|FreeRTOS/FreeRTOS/Source/portable/GCC/ARM_CA9/|FreeRTOS/FreeRTOS/Source/portable/GCC/ARM_CM0/|FreeRTOS/FreeRTOS/Source/portable/GCC/ARM_CM23/|FreeRTOS/FreeRTOS/Source/portable/GCC/ARM_CM23_NTZ/|FreeRTOS/FreeRTOS/Source/portable/GCC/ARM_CM3/|FreeRTOS/FreeRTOS/Source/portable/GCC/ARM_CM3_MPU/|FreeRTOS/FreeRTOS/Source/portable/GCC/ARM_CM33/|FreeRTOS/FreeRTOS/Source/portable/GCC/ARM_CM33_NTZ/|FreeRTOS/FreeRTOS/Source/portable/GCC/ARM_CM4_MPU/|FreeRTOS/FreeRTOS/Source/portable/GCC/ARM_CM4F/|FreeRTOS/FreeRTOS/Source/portable/GCC/ARM_CM7/|FreeRTOS/FreeRTOS/Source/portable/GCC/ARM_CR5/|FreeRTOS/FreeRTOS/Source/portable/GCC/ARM_CRx_No_GIC/|FreeRTOS/FreeRTOS/Source/portable/GCC/ARM7_AT91FR40008/|FreeRTOS/FreeRTOS/Source/portable/GCC/ARM7_AT91SAM7S/|FreeRTOS/FreeRTOS/Source/portable/GCC/ARM7_LPC2000/|FreeRTOS/FreeRTOS/Source/portable/GCC/ARM7_LPC23xx/|FreeRTOS/FreeRTOS/Source/portable/GCC/AVR32_UC3/|FreeRTOS/FreeRTOS/Source/portable/GCC/ColdFire_V2/|FreeRTOS/FreeRTOS/Source/portable/GCC/CORTUS_APS3/|FreeRTOS/FreeRTOS/Source/portable/GCC/H8S2329/|FreeRTOS/FreeRTOS/Source/portable/GCC/HCS12/|FreeRTOS/FreeRTOS/Source/portable/GCC/IA32_flat/|FreeRTOS/FreeRTOS/Source/portable/GCC/MCF5235/|FreeRTOS/FreeRTOS/Source/portable/GCC/MicroBlaze/|FreeRTOS/FreeRTOS/Source/portable/GCC/MicroBlazeV8/|FreeRTOS/FreeRTOS/Source/portable/GCC/MicroBlazeV9/|FreeRTOS/FreeRTOS/Source/portable/GCC/MSP430F449/|FreeRTOS/FreeRTOS/Source/portable/GCC/NiosII/|FreeRTOS/FreeRTOS/Source/portable/GCC/PPC405_Xilinx/|FreeRTOS/FreeRTOS/Source/portable/GCC/PPC440_Xilinx/|FreeRTOS/FreeRTOS/Source/portable/GCC/RISC-V/|FreeRTOS/FreeRTOS/Source/portable/GCC/RL78/|FreeRTOS/FreeRTOS/Source/portable/GCC/RX100/|FreeRTOS/FreeRTOS/Source/portable/GCC/RX600/|FreeRTOS/FreeRTOS/Source/portable/GCC/RX600v2/|FreeRTOS/FreeRTOS/Source/portable/GCC/STR75x/|FreeRTOS/FreeRTOS/Source/portable/GCC/TriCore_1782/|FreeRTOS/FreeRTOS/Source/portable/MemMang/heap_1.c|FreeRTOS/FreeRTOS/Source/portable/MemMang/heap_2.c|FreeRTOS/FreeRTOS/Source/portable/MemMang/heap_3.c|FreeRTOS/FreeRTOS/Source/portable/MemMang/heap_5.c" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name=""/>
+					</sourceEntries>
+				</configuration>
+			</storageModule>
+			<storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
+		</cconfiguration>
+	</storageModule>
+	<storageModule moduleId="cdtBuildSystem" version="4.0.0">
+		<project id="horOvIp-I2C-Bridge.null.2121720705" name="horOvIp-I2C-Bridge"/>
+	</storageModule>
+	<storageModule moduleId="org.eclipse.cdt.core.LanguageSettingsProviders"/>
+	<storageModule moduleId="refreshScope" versionNumber="2">
+		<configuration configurationName="Default">
+			<resource resourceType="PROJECT" workspacePath="/horOvIp-I2C-Bridge"/>
+		</configuration>
+	</storageModule>
+	<storageModule moduleId="org.eclipse.cdt.make.core.buildtargets"/>
+	<storageModule moduleId="scannerConfiguration">
+		<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
+		<scannerConfigBuildInfo instanceId="de.innot.avreclipse.toolchain.winavr.base.1382193447;de.innot.avreclipse.toolchain.winavr.base.1382193447.888289265;de.innot.avreclipse.tool.compiler.winavr.base.321224120;de.innot.avreclipse.compiler.winavr.input.1558052664">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="de.innot.avreclipse.core.AVRGCCManagedMakePerProjectProfileC"/>
+		</scannerConfigBuildInfo>
+	</storageModule>
+</cproject>
