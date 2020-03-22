@@ -144,6 +144,8 @@
             <Value>%24(PackRepoDir)\Atmel\ATmega_DFP\1.3.300\include</Value>
             <Value>..</Value>
             <Value>../uip/uip</Value>
+            <Value>../FreeRTOS/FreeRTOS/Source/include</Value>
+            <Value>../FreeRTOS/FreeRTOS/Source/portable/GCC/ATMega323</Value>
           </ListValues>
         </avrgcc.compiler.directories.IncludePaths>
         <avrgcc.compiler.optimization.level>Optimize debugging experience (-Og)</avrgcc.compiler.optimization.level>
@@ -182,6 +184,33 @@
     <Compile Include="config.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="FreeRTOSConfig.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="FreeRTOS\FreeRTOS\Source\include\FreeRTOS.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="FreeRTOS\FreeRTOS\Source\list.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="FreeRTOS\FreeRTOS\Source\portable\GCC\ATMega323\port.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="FreeRTOS\FreeRTOS\Source\portable\GCC\ATMega323\portmacro.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="FreeRTOS\FreeRTOS\Source\portable\MemMang\heap_4.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="FreeRTOS\FreeRTOS\Source\queue.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="FreeRTOS\FreeRTOS\Source\tasks.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="FreeRTOS\FreeRTOS\Source\timers.c">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="I2C.c">
       <SubType>compile</SubType>
     </Compile>
@@ -191,16 +220,13 @@
     <Compile Include="main.c">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="prvtimers.c">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="serDebugOut.c">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="serDebugOut.h">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="timers.c">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="timers.h">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="uip-app-IP2I2C.h">
@@ -226,6 +252,26 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="FreeRTOS\" />
+    <Folder Include="FreeRTOS\" />
+    <Folder Include="FreeRTOS\" />
+    <Folder Include="FreeRTOS\" />
+    <Folder Include="FreeRTOS\" />
+    <Folder Include="FreeRTOS\FreeRTOS\" />
+    <Folder Include="FreeRTOS\FreeRTOS\" />
+    <Folder Include="FreeRTOS\FreeRTOS\" />
+    <Folder Include="FreeRTOS\FreeRTOS\" />
+    <Folder Include="FreeRTOS\FreeRTOS\" />
+    <Folder Include="FreeRTOS\FreeRTOS\Source\" />
+    <Folder Include="FreeRTOS\FreeRTOS\Source\" />
+    <Folder Include="FreeRTOS\FreeRTOS\Source\" />
+    <Folder Include="FreeRTOS\FreeRTOS\Source\" />
+    <Folder Include="FreeRTOS\FreeRTOS\Source\" />
+    <Folder Include="FreeRTOS\FreeRTOS\Source\include\" />
+    <Folder Include="FreeRTOS\FreeRTOS\Source\portable\" />
+    <Folder Include="FreeRTOS\FreeRTOS\Source\portable\GCC\" />
+    <Folder Include="FreeRTOS\FreeRTOS\Source\portable\GCC\ATMega323\" />
+    <Folder Include="FreeRTOS\FreeRTOS\Source\portable\MemMang\" />
     <Folder Include="uip_slip" />
     <Folder Include="uip\" />
     <Folder Include="uip\" />

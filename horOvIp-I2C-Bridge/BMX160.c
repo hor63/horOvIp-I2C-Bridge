@@ -16,7 +16,7 @@
 
 #include "BMX160.h"
 #include "serDebugOut.h"
-#include "timers.h"
+#include "prvtimers.h"
 #include "I2C.h"
 
 #include "BMX160defs.h"

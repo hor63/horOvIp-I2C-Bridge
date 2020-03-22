@@ -11,9 +11,12 @@
 #include <avr/interrupt.h>
 #include <util/delay.h>
 
+#include "FreeRTOS.h"
+#include "task.h"
+
 #include "uip.h"
 #include "uip_slip/slip_usart.h"
-#include "timers.h"
+#include "prvtimers.h"
 #include "I2C.h"
 #include "BMX160.h"
 #include "serDebugOut.h"
@@ -111,6 +114,10 @@ int main(void) {
 
 	DEBUG_OUT("STARTUP done\n");
 
+	// Enable sleep here. The idle hook will sleep the processor
+	sleep_enable();
+	vTaskStartScheduler();
+
 
     while (1) {
     	uint8_t i;
@@ -146,6 +153,13 @@ int main(void) {
     }
 
 }
+
+void vApplicationIdleHook( void ) {
+
+	sleep_cpu();
+
+}
+
 
 /** \brief process an incoming message on the TCP connection
  *

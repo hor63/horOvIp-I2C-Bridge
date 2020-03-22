@@ -78,4 +78,9 @@
  */
 #define DEBUG_PRINT 1
 
+#define TASK_PRIO_TIMERS	1
+#define TASK_PRIO_TCP		2
+#define TASK_PRIO_I2C		3
+#define TASK_PRIO_SERIAL	4
+
 #endif /* CONFIG_H_ */
