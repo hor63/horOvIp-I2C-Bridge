@@ -4,3 +4,10 @@
 [submodule "horOvIp-I2C-Bridge/FreeRTOS"]
 	path = horOvIp-I2C-Bridge/FreeRTOS
 	url = https://github.com/hor63/FreeRTOS.git
+[submodule "horOvIp-I2C-Bridge/lwip"]
+	path = horOvIp-I2C-Bridge/lwip
+	url = https://github.com/hor63/lwip.git
+	branch = STABLE-2_1_x
+[submodule "horOvIp-I2C-Bridge/lwip-contrib"]
+	path = horOvIp-I2C-Bridge/lwip-contrib
+	url = https://github.com/hor63/lwip-contrib.git
