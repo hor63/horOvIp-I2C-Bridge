@@ -9,8 +9,12 @@
 #include <stdbool.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include <avr/cpufunc.h>
 
 #include "serDebugOut.h"
+
+#include "FreeRTOS.h"
+#include "semphr.h"
 
 /// The term "(F_CPU + DEBUG_PORT_BAUD_RATE*8)" rounds the UBRR value to the next integer
 #define USART_BAUD_CONFIG_VAL (((F_CPU + DEBUG_PORT_BAUD_RATE*8)/(16*DEBUG_PORT_BAUD_RATE))-1)
@@ -33,11 +37,20 @@ static uint8_t outBuf[256];
 static uint8_t currOutIndex = 0;
 static uint8_t nextFreeIndex = 0;
 
+static SemaphoreHandle_t debugOutMutex = NULL;
 
 void debugOutInit() {
 	
+	// Create the semaphore for synchronized access
+	debugOutMutex = xSemaphoreCreateRecursiveMutex();
+
 	// Setup the serial port USART1
-	// set or reset the control and status register
+
+	// Setup the baud rate.
+	UBRR1H = (USART_BAUD_CONFIG_VAL >> 8) & 0b00001111; // upper 4 bits are reserved and must be set 0.
+	UBRR1L = USART_BAUD_CONFIG_VAL & 0xff;
+
+// set or reset the control and status register
 	UCSR1A = 0
 	// | _BV(RXC1)		// USART Receive Complete (R/O)
 	| _BV(TXC1)		// USART Transmit Complete (Write 1 resets the flag)
@@ -72,25 +85,52 @@ void debugOutInit() {
 	// | _BV(UCPOL1)		// Clock Polarity (Unused, set 0)
 	;
 
-	// Setup the baud rate.
-	UBRR1H = (USART_BAUD_CONFIG_VAL >> 8) & 0b00001111; // upper 4 bits are reserved and must be set 0.
-	UBRR1L = USART_BAUD_CONFIG_VAL & 0xff;
-	
+
 }
 
-static void activateSender() {
+static inline bool enterCriticalSection() {
+	if (debugOutMutex) {
+		// Someone did not give up the mutex within one second. Give up, and skip debug printing.
+		if (xSemaphoreTakeRecursive (debugOutMutex,1000 / portTICK_PERIOD_MS) == pdFALSE) {
+			return false;
+		}
+	}
+	return true;
+}
+
+static inline void leaveCriticalSection() {
+	if (debugOutMutex) {
+		// Someone did not give up the mutex within one second. Give up, and skip debug printing.
+		xSemaphoreGiveRecursive (debugOutMutex);
+	}
+}
+
+
+static inline void activateSender() {
 	// Activate the Send buffer empty interrupt
 	UCSR1B |= _BV(UDRIE1);
+}
 
+/** Before the end of the ring buffer over-takes the end
+ * drop the earliest characters in the buffer, but preserve as much of the
+ * debug output buffer.
+ */
+static inline void advanceBufferStart() {
+	if (currOutIndex == nextFreeIndex) {
+		++currOutIndex;
+		_MemoryBarrier();
+	}
 }
 
 void debugOutStr(const char* str) {
+	bool strNotEmpty = false;
 
-bool strNotEmpty = false;
-	
+	enterCriticalSection();
+
 	while (*str) {
 		outBuf[nextFreeIndex] = *str;
 		++nextFreeIndex;
+		advanceBufferStart();
 		++str;
 		strNotEmpty = true;
 	}
@@ -99,24 +139,32 @@ bool strNotEmpty = false;
 		activateSender();
 	}
 	
+	leaveCriticalSection();
 }
 
 void debugOutChr(char chr) {
+	enterCriticalSection();
 	
 	if (chr) {
 		outBuf[nextFreeIndex] = chr;
 		++nextFreeIndex;
+		advanceBufferStart();
 		activateSender();
 	}
 
+	leaveCriticalSection();
 }
 
 void debugOutInt(int val) {
+	enterCriticalSection();
 	debugOutStr(itoa(val,convertBuf,10));
+	leaveCriticalSection();
 }
 
 void debugOutUInt(unsigned int val) {
+	enterCriticalSection();
 	debugOutStr(utoa(val,convertBuf,10));
+	leaveCriticalSection();
 }
 
 static const char hexNibbleVal[] = {
@@ -124,18 +172,24 @@ static const char hexNibbleVal[] = {
 };
 
 void debugOutByteHex(unsigned char val) {
+	enterCriticalSection();
 	debugOutChr(hexNibbleVal[val>>4]);
 	debugOutChr(hexNibbleVal[val&0x0f]);
+	leaveCriticalSection();
 }
 
 
 void debugOutUIntHex(unsigned int val) {
+	enterCriticalSection();
 	debugOutStr(utoa(val,convertBuf,16));
+	leaveCriticalSection();
 }
 
 void uip_log(char *msg) {
+	enterCriticalSection();
 	debugOutStr(msg);
 	debugOutChr('\n');
+	leaveCriticalSection();
 
 }
 
