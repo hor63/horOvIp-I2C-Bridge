@@ -83,7 +83,7 @@
   <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
     <ToolchainSettings>
       <AvrGcc>
-        <avrgcc.common.Device>-mmcu=atmega1284p -B "%24(PackRepoDir)\Atmel\ATmega_DFP\1.3.300\gcc\dev\atmega1284p"</avrgcc.common.Device>
+        <avrgcc.common.Device>-mmcu=atmega1284p -B "%24(PackRepoDir)\Atmel\ATmega_DFP\1.4.346\gcc\dev\atmega1284p"</avrgcc.common.Device>
         <avrgcc.common.optimization.RelaxBranches>True</avrgcc.common.optimization.RelaxBranches>
         <avrgcc.common.outputfiles.hex>True</avrgcc.common.outputfiles.hex>
         <avrgcc.common.outputfiles.lss>True</avrgcc.common.outputfiles.lss>
@@ -99,9 +99,13 @@
         </avrgcc.compiler.symbols.DefSymbols>
         <avrgcc.compiler.directories.IncludePaths>
           <ListValues>
-            <Value>%24(PackRepoDir)\Atmel\ATmega_DFP\1.3.300\include</Value>
             <Value>..</Value>
             <Value>../uip/uip</Value>
+            <Value>../FreeRTOS/FreeRTOS/Source/include</Value>
+            <Value>../FreeRTOS/FreeRTOS/Source/portable/GCC/ATMega323</Value>
+            <Value>../lwip-contrib/ports/freertos/include</Value>
+            <Value>../lwip/src/include</Value>
+            <Value>%24(PackRepoDir)\Atmel\ATmega_DFP\1.4.346\include</Value>
           </ListValues>
         </avrgcc.compiler.directories.IncludePaths>
         <avrgcc.compiler.optimization.level>Optimize for size (-Os)</avrgcc.compiler.optimization.level>
@@ -116,7 +120,7 @@
         </avrgcc.linker.libraries.Libraries>
         <avrgcc.assembler.general.IncludePaths>
           <ListValues>
-            <Value>%24(PackRepoDir)\Atmel\ATmega_DFP\1.3.300\include</Value>
+            <Value>%24(PackRepoDir)\Atmel\ATmega_DFP\1.4.346\include</Value>
           </ListValues>
         </avrgcc.assembler.general.IncludePaths>
       </AvrGcc>
@@ -125,7 +129,7 @@
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <ToolchainSettings>
       <AvrGcc>
-        <avrgcc.common.Device>-mmcu=atmega1284p -B "%24(PackRepoDir)\Atmel\ATmega_DFP\1.3.300\gcc\dev\atmega1284p"</avrgcc.common.Device>
+        <avrgcc.common.Device>-mmcu=atmega1284p -B "%24(PackRepoDir)\Atmel\ATmega_DFP\1.4.346\gcc\dev\atmega1284p"</avrgcc.common.Device>
         <avrgcc.common.optimization.RelaxBranches>True</avrgcc.common.optimization.RelaxBranches>
         <avrgcc.common.outputfiles.hex>True</avrgcc.common.outputfiles.hex>
         <avrgcc.common.outputfiles.lss>True</avrgcc.common.outputfiles.lss>
@@ -141,11 +145,13 @@
         </avrgcc.compiler.symbols.DefSymbols>
         <avrgcc.compiler.directories.IncludePaths>
           <ListValues>
-            <Value>%24(PackRepoDir)\Atmel\ATmega_DFP\1.3.300\include</Value>
             <Value>..</Value>
             <Value>../uip/uip</Value>
             <Value>../FreeRTOS/FreeRTOS/Source/include</Value>
             <Value>../FreeRTOS/FreeRTOS/Source/portable/GCC/ATMega323</Value>
+            <Value>../lwip-contrib/ports/freertos/include</Value>
+            <Value>../lwip/src/include</Value>
+            <Value>%24(PackRepoDir)\Atmel\ATmega_DFP\1.4.346\include</Value>
           </ListValues>
         </avrgcc.compiler.directories.IncludePaths>
         <avrgcc.compiler.optimization.level>Optimize debugging experience (-Og)</avrgcc.compiler.optimization.level>
@@ -161,7 +167,7 @@
         </avrgcc.linker.libraries.Libraries>
         <avrgcc.assembler.general.IncludePaths>
           <ListValues>
-            <Value>%24(PackRepoDir)\Atmel\ATmega_DFP\1.3.300\include</Value>
+            <Value>%24(PackRepoDir)\Atmel\ATmega_DFP\1.4.346\include</Value>
           </ListValues>
         </avrgcc.assembler.general.IncludePaths>
         <avrgcc.assembler.debugging.DebugLevel>Default (-Wa,-g)</avrgcc.assembler.debugging.DebugLevel>
@@ -244,10 +250,292 @@
     <Compile Include="I2C.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="lwip-contrib\ports\freertos\include\arch\sys_arch.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip-contrib\ports\freertos\sys_arch.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwipopts.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\api\api_lib.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\api\api_msg.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\api\err.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\api\if_api.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\api\netbuf.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\api\netdb.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\api\netifapi.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\api\sockets.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\api\tcpip.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\def.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\dns.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\inet_chksum.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\init.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\ip.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\ipv4\autoip.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\ipv4\dhcp.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\ipv4\etharp.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\ipv4\icmp.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\ipv4\igmp.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\ipv4\ip4.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\ipv4\ip4_addr.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\ipv4\ip4_frag.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\ipv6\dhcp6.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\ipv6\ethip6.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\ipv6\icmp6.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\ipv6\inet6.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\ipv6\ip6.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\ipv6\ip6_addr.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\ipv6\ip6_frag.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\ipv6\mld6.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\ipv6\nd6.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\mem.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\memp.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\netif.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\pbuf.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\raw.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\stats.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\sys.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\tcp.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\tcp_in.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\tcp_out.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\timeouts.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\core\udp.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\include\compat\posix\arpa\inet.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\include\compat\posix\netdb.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\include\compat\posix\net\if.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\include\compat\posix\sys\socket.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\include\compat\stdc\errno.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\include\netif\ppp\ccp.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\include\netif\ppp\chap-md5.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\include\netif\ppp\chap-new.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\include\netif\ppp\chap_ms.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\include\netif\ppp\eap.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\include\netif\ppp\polarssl\arc4.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\include\netif\ppp\polarssl\des.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\include\netif\ppp\polarssl\md4.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\include\netif\ppp\polarssl\md5.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\include\netif\ppp\polarssl\sha1.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\netif\ppp\auth.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\netif\ppp\ccp.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\netif\ppp\chap-md5.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\netif\ppp\chap-new.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\netif\ppp\chap_ms.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\netif\ppp\demand.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\netif\ppp\eap.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\netif\ppp\ecp.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\netif\ppp\eui64.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\netif\ppp\fsm.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\netif\ppp\ipcp.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\netif\ppp\ipv6cp.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\netif\ppp\lcp.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\netif\ppp\magic.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\netif\ppp\mppe.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\netif\ppp\multilink.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\netif\ppp\polarssl\arc4.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\netif\ppp\polarssl\des.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\netif\ppp\polarssl\md4.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\netif\ppp\polarssl\md5.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\netif\ppp\polarssl\sha1.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\netif\ppp\ppp.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\netif\ppp\pppapi.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\netif\ppp\pppcrypt.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\netif\ppp\pppoe.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\netif\ppp\pppol2tp.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\netif\ppp\pppos.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\netif\ppp\upap.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\netif\ppp\utils.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="lwip\src\netif\ppp\vj.c">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="main.c">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="prvtimers.c">
+    <Compile Include="PPP\PPPApp.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="PPP\PPPApp.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="PPP\ppp_usart_atmega.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="PPP\ppp_usart_atmega.h">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="serDebugOut.c">
@@ -256,22 +544,10 @@
     <Compile Include="serDebugOut.h">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="uip-app-IP2I2C.h">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="uip-conf.h">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="uip\uip\uip.c">
-      <SubType>compile</SubType>
-    </Compile>
     <Compile Include="uip\uip\uip.h">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="uip\uip\uipopt.h">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="uip_slip\slip_usart.c">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="uip_slip\slip_usart.h">
@@ -299,6 +575,95 @@
     <Folder Include="FreeRTOS\FreeRTOS\Source\portable\GCC\" />
     <Folder Include="FreeRTOS\FreeRTOS\Source\portable\GCC\ATMega323\" />
     <Folder Include="FreeRTOS\FreeRTOS\Source\portable\MemMang\" />
+    <Folder Include="lwip-contrib\" />
+    <Folder Include="lwip-contrib\" />
+    <Folder Include="lwip-contrib\ports\" />
+    <Folder Include="lwip-contrib\ports\" />
+    <Folder Include="lwip-contrib\ports\freertos\" />
+    <Folder Include="lwip-contrib\ports\freertos\" />
+    <Folder Include="lwip-contrib\ports\freertos\include\" />
+    <Folder Include="lwip-contrib\ports\freertos\include\arch\" />
+    <Folder Include="lwip\" />
+    <Folder Include="lwip\" />
+    <Folder Include="lwip\" />
+    <Folder Include="lwip\" />
+    <Folder Include="lwip\src\" />
+    <Folder Include="lwip\src\" />
+    <Folder Include="lwip\src\" />
+    <Folder Include="lwip\src\" />
+    <Folder Include="lwip\src\api\" />
+    <Folder Include="lwip\src\core\" />
+    <Folder Include="lwip\src\core\" />
+    <Folder Include="lwip\src\core\ipv4\" />
+    <Folder Include="lwip\src\core\ipv6\" />
+    <Folder Include="lwip\src\include\" />
+    <Folder Include="lwip\src\include\" />
+    <Folder Include="lwip\src\include\" />
+    <Folder Include="lwip\src\include\" />
+    <Folder Include="lwip\src\include\" />
+    <Folder Include="lwip\src\include\" />
+    <Folder Include="lwip\src\include\" />
+    <Folder Include="lwip\src\include\" />
+    <Folder Include="lwip\src\include\" />
+    <Folder Include="lwip\src\include\" />
+    <Folder Include="lwip\src\include\" />
+    <Folder Include="lwip\src\include\" />
+    <Folder Include="lwip\src\include\" />
+    <Folder Include="lwip\src\include\" />
+    <Folder Include="lwip\src\include\" />
+    <Folder Include="lwip\src\include\" />
+    <Folder Include="lwip\src\include\" />
+    <Folder Include="lwip\src\include\compat\" />
+    <Folder Include="lwip\src\include\compat\" />
+    <Folder Include="lwip\src\include\compat\" />
+    <Folder Include="lwip\src\include\compat\" />
+    <Folder Include="lwip\src\include\compat\" />
+    <Folder Include="lwip\src\include\compat\" />
+    <Folder Include="lwip\src\include\compat\posix\" />
+    <Folder Include="lwip\src\include\compat\posix\" />
+    <Folder Include="lwip\src\include\compat\posix\" />
+    <Folder Include="lwip\src\include\compat\posix\" />
+    <Folder Include="lwip\src\include\compat\posix\" />
+    <Folder Include="lwip\src\include\compat\posix\arpa\" />
+    <Folder Include="lwip\src\include\compat\posix\arpa\" />
+    <Folder Include="lwip\src\include\compat\posix\net\" />
+    <Folder Include="lwip\src\include\compat\posix\sys\" />
+    <Folder Include="lwip\src\include\compat\stdc\" />
+    <Folder Include="lwip\src\include\netif\" />
+    <Folder Include="lwip\src\include\netif\" />
+    <Folder Include="lwip\src\include\netif\" />
+    <Folder Include="lwip\src\include\netif\" />
+    <Folder Include="lwip\src\include\netif\" />
+    <Folder Include="lwip\src\include\netif\" />
+    <Folder Include="lwip\src\include\netif\" />
+    <Folder Include="lwip\src\include\netif\" />
+    <Folder Include="lwip\src\include\netif\" />
+    <Folder Include="lwip\src\include\netif\" />
+    <Folder Include="lwip\src\include\netif\" />
+    <Folder Include="lwip\src\include\netif\ppp\" />
+    <Folder Include="lwip\src\include\netif\ppp\" />
+    <Folder Include="lwip\src\include\netif\ppp\" />
+    <Folder Include="lwip\src\include\netif\ppp\" />
+    <Folder Include="lwip\src\include\netif\ppp\" />
+    <Folder Include="lwip\src\include\netif\ppp\" />
+    <Folder Include="lwip\src\include\netif\ppp\" />
+    <Folder Include="lwip\src\include\netif\ppp\" />
+    <Folder Include="lwip\src\include\netif\ppp\" />
+    <Folder Include="lwip\src\include\netif\ppp\" />
+    <Folder Include="lwip\src\include\netif\ppp\" />
+    <Folder Include="lwip\src\include\netif\ppp\polarssl\" />
+    <Folder Include="lwip\src\include\netif\ppp\polarssl\" />
+    <Folder Include="lwip\src\include\netif\ppp\polarssl\" />
+    <Folder Include="lwip\src\include\netif\ppp\polarssl\" />
+    <Folder Include="lwip\src\include\netif\ppp\polarssl\" />
+    <Folder Include="lwip\src\include\netif\ppp\polarssl\" />
+    <Folder Include="lwip\src\netif\" />
+    <Folder Include="lwip\src\netif\ppp\" />
+    <Folder Include="lwip\src\netif\ppp\polarssl\" />
+    <Folder Include="PPP\" />
+    <Folder Include="PPP\" />
+    <Folder Include="PPP\" />
+    <Folder Include="PPP\" />
     <Folder Include="uip_slip" />
     <Folder Include="uip\" />
     <Folder Include="uip\" />

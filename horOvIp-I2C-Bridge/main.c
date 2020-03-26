@@ -15,45 +15,19 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "timers.h"
+#include "semphr.h"
 
-#include "uip.h"
-#include "uip_slip/slip_usart.h"
-#include "prvtimers.h"
+#include "lwip/tcpip.h"
+
+#include "PPP/PPPApp.h"
+
 #include "I2C.h"
 #include "BMX160.h"
 #include "serDebugOut.h"
+#include "PPP/ppp_usart_atmega.h"
 
-volatile bool mainLoopMustRun = false;
 
-static void uipTimerCallb (uint8_t numTicks) {
-	// Round the number of ticks
-	static const uint8_t numTicksUipPeriodic = BMX160ODR / UIP_PERIODIC_POLL_FREQUENCY;
-	static uint8_t lastNumTicks = 0;
-
-	static uint8_t numTicsElapsed = 0;
-	uint8_t i;
-
-	if (numTicks > lastNumTicks) {
-		numTicsElapsed += numTicks - lastNumTicks;
-	} else {
-		numTicsElapsed += UINT8_MAX - lastNumTicks + numTicks;
-	}
-	lastNumTicks = numTicks;
-
-	if (numTicsElapsed > numTicksUipPeriodic) {
-		for(i = 0; i < UIP_CONNS; ++i) {
-			uip_periodic(i);
-			if(uip_len > 0) {
-				slipQueueUIPSendMessage();
-			}
-		}
-		numTicsElapsed = 0;
-	}
-
-}
-
-static struct TimerTickCallbChain uipTimerCallChainItem;
-static void vTestTask( void *pvParameters );
+static void initTask( void *pvParameters );
 static void vTestTimerFunction( TimerHandle_t xTimer );
 static TimerHandle_t testTimer;
 
@@ -74,54 +48,13 @@ int main(void) {
 	
 	set_sleep_mode(0);
 	
-	DEBUG_INIT();
-	DEBUG_OUT("\n\nhorOV IMU board V0.1\n");
-	
-	uip_init();
-
-	slipInit();
-	
-	{
-		// Define MAKE_IP_ADDRESS here. It is called in the IP address macros is BMX160Net.h
-		// and is defined here just before it is used.
-#define MAKE_IP_ADDR(a,b,c,d) uip_ipaddr(&addr,a,b,c,d)
-		uip_ipaddr_t addr;
-		MAKE_IP_ADDR_I2C_BRIDGE;
-		uip_sethostaddr(&addr);
-		MAKE_IP_NETMASK_I2C_BRIDGE;
-		uip_setnetmask(&addr);
-		MAKE_IP_PEER_ADDR_I2C_BRIDGE;
-		uip_setdraddr(&addr);
-	}
-	uip_listen(HTONS(19463));
-
 	// Start interrupts here
 	sei();
-
-	// Let other components start up safely, particularly the IMU but also other sensors
-	_delay_ms(1000);
-
-	BMX160Init();
-
-	// Let the data capturing get into the swing
-	_delay_ms(200);
-
-	slipStart();
-
-	BMX160StartDataCapturing();
-
-	timerStart();
-
-	uipTimerCallChainItem.callbFunc = uipTimerCallb;
-	uipTimerCallChainItem.next = NULL;
-	timerAddCallback(&uipTimerCallChainItem);
-
-	DEBUG_OUT("STARTUP done\n");
 
 	// Enable sleep here. The idle hook will sleep the processor
 	sleep_enable();
 
-	xTaskCreate( vTestTask, "Test", configMINIMAL_STACK_SIZE, NULL, TASK_PRIO_APP, NULL );
+	xTaskCreate( initTask, "Init", configMINIMAL_STACK_SIZE, NULL, TASK_PRIO_APP, NULL );
 	testTimer = xTimerCreate("Blinky",33,pdTRUE,vTestTimerFunction,vTestTimerFunction);
 	xTimerStart(testTimer,10);
 
@@ -130,55 +63,46 @@ int main(void) {
 
 	vTaskStartScheduler();
 
+}
 
-    while (1) {
-    	uint8_t i;
+void tcpipInitDoneCb (void* d) {
+	SemaphoreHandle_t sem = (SemaphoreHandle_t) d;
 
-
-		if (mainLoopMustRun) {
-			// I am running the main loop body. So reset the flag.
-			// It may be set by an interrupt handler or application code called here.
-			mainLoopMustRun = false;
-
-			timerPoll();
-			I2CPoll();
-			slipProcessReadBuffer();
-
-			// Polling the connections without timer processing.
-			for(i = 0; i < UIP_CONNS; ++i) {
-				uip_poll_conn((&(uip_conns [i])));
-				if(uip_len > 0) {
-					slipQueueUIPSendMessage();
-				}
-			}
-		}
-
-		cli();
-		if (!mainLoopMustRun) {
-			sleep_enable();
-			sei();
-			sleep_cpu();
-			sleep_disable();
-		} else {
-			sei();
-		}
-    }
+	xSemaphoreGive(sem);
 
 }
 
+static void initTask( void *pvParameters ) {
 
-static void vTestTask( void *pvParameters ) {
+	DEBUG_INIT();
+	DEBUG_OUT("\n\nhorOV IMU board V0.2\n");
 
-	// Set the direction of the LED pin output
-	DDRB |= _BV(DDB3);
+	SemaphoreHandle_t tcpStartSem = xSemaphoreCreateBinary();
 
-	for (;;) {
-		// Toggle the pin
-		PINB = _BV(PINB3);
+	tcpip_init(NULL, NULL);
 
-		// And wait 500ms
-		vTaskDelay(100);
-	}
+	// Let other components start up safely, particularly the IMU but also other sensors
+	vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+	BMX160Init();
+
+	// Let the data capturing get into the swing
+	vTaskDelay(200 / portTICK_PERIOD_MS);
+
+	BMX160StartDataCapturing();
+
+	xSemaphoreTake(tcpStartSem,10000/portTICK_PERIOD_MS);
+
+	// Initialize PPP and startup the PPP listener.
+	pppAppInit();
+
+	DEBUG_OUT("STARTUP done\n");
+
+	// And wait 500ms
+	vTaskDelay(500 / portTICK_PERIOD_MS);
+
+	// Terminate yourself
+	vTaskDelete(NULL);
 
 }
 
@@ -200,19 +124,22 @@ void vApplicationIdleHook( void ) {
  *
  * Only messages of type \ref struct BMX160RecvData are being expected
  *
+ * @param data Pointer to the receive data
+ * @param len length of received data
  * @return true when the function put a message into the send buffer, i.e. the uip application callback must not send any other data.
  */
-static bool processTCPMessage() {
+
+static bool processTCPMessage(void const *data,size_t len) {
 	bool rc = false;
 	
 	/*
 	uip_appdata pointer. The size of the data is
 	* available through the uip_len
 	*/
-	struct BMX160RecvData *recvData = (struct BMX160RecvData *)uip_appdata;
+	struct BMX160RecvData *recvData = (struct BMX160RecvData const *)data;
 	struct BMX160Data* bmxData;
 	
-	if (uip_len == recvData->header.length) {
+	if (len == recvData->header.length) {
 		// Seems legit
 		switch (recvData->header.unionCode) {
 			case BMX160RECV_DATA_RESET_IMU:
@@ -224,10 +151,12 @@ static bool processTCPMessage() {
 				BMX160ReadTrimRegisters();
 				bmxData = BMX160GetData();				
 				
+				/** todo send answer
 				if (uip_mss() >= bmxData->header.length) {
 					uip_send (bmxData,bmxData->header.length);
 					rc = true;
 				}
+				*/
 				
 				// restart the data capture
 				BMX160StartDataCapturing();
@@ -259,30 +188,13 @@ static bool processTCPMessage() {
 	return rc;
 }
 
-
+// todo Replace this callback with a task based code
 void ip_i2c_bridge_appcall() {
 	struct BMX160Data* bmx160Data = BMX160GetData();
 	bool sendBMXData = false;
 
-/*
-	uip_newdata()
-	uip_poll()
 
-	uip_mss()
-
-*/
-
-	if (uip_closed() || uip_aborted()) {
-		uip_conn->appstate.numSendPackagesPending = 0;
-		return;
-	}
-
-	if (uip_timedout()) {
-		uip_close();
-		uip_conn->appstate.numSendPackagesPending = 0;
-		return;
-	}
-
+	/** todo After accepting a new connection send the Mag trim data
 	if(uip_connected()) {
 		uip_conn->appstate.sensorTime0 = 0;
 		uip_conn->appstate.sensorTime1 = 0;
@@ -295,32 +207,28 @@ void ip_i2c_bridge_appcall() {
 		mainLoopMustRun = true;
 		return;
 	}
+	 */
 
-	if (uip_acked()) {
-		(uip_conn->appstate.numSendPackagesPending)--;
-	}
 
+	/** todo Read and process incoming messages
 	if(uip_newdata()) {
 		if (processTCPMessage()) {
 			mainLoopMustRun = true;
 			return;
 		}
 	}
+	*/
 
-	if (uip_rexmit()) {
-		if (uip_mss() >= sizeof (struct BMX160Data)) {
-			sendBMXData = true;
-		}
-	} else {
-			if (BMX160IsDataValid() &&
-				bmx160Data->header.unionCode != BMX160DATA_TRIM && (
-					bmx160Data->header.sensorTime0 != uip_conn->appstate.sensorTime0 ||
-					bmx160Data->header.sensorTime1 != uip_conn->appstate.sensorTime1 ||
-					bmx160Data->header.sensorTime2 != uip_conn->appstate.sensorTime2
-					) &&
-					uip_mss() >= bmx160Data->header.length) {
-				sendBMXData = true;
-			}
+
+	/** todo Send BMX data when new ones become available.
+	if (BMX160IsDataValid() &&
+		bmx160Data->header.unionCode != BMX160DATA_TRIM && (
+			bmx160Data->header.sensorTime0 != uip_conn->appstate.sensorTime0 ||
+			bmx160Data->header.sensorTime1 != uip_conn->appstate.sensorTime1 ||
+			bmx160Data->header.sensorTime2 != uip_conn->appstate.sensorTime2
+			) &&
+			uip_mss() >= bmx160Data->header.length) {
+		sendBMXData = true;
 	}
 
 	if (sendBMXData) {
@@ -333,5 +241,5 @@ void ip_i2c_bridge_appcall() {
 		
 		mainLoopMustRun = true;
 	}
-	
+	*/
 }

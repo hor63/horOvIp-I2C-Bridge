@@ -16,12 +16,10 @@
 
 #include "BMX160.h"
 #include "serDebugOut.h"
-#include "prvtimers.h"
 #include "I2C.h"
 
 #include "BMX160defs.h"
 
-extern volatile bool mainLoopMustRun;
 
 // Constants used in the compensation calculations
 /**\name OVERFLOW DEFINITIONS  */
@@ -59,8 +57,6 @@ static bool dataValid = false;
 static bool transferRunning = false;
 
 static uint8_t dataBuf [32];
-
-static struct TimerTickCallbChain bmx160timerChainItem;
 
 // Raw trim registers are being read at the startup
 static uint8_t trim_x1y1[2] = {0};
@@ -450,7 +446,6 @@ static void readSensorDataWOMagCallb (
 
 	dataValid = true;
 	transferRunning = false;
-	mainLoopMustRun = true;
 
 /*
 	DEBUG_OUT("Sensor data no Mag, len = ");
@@ -490,7 +485,6 @@ static void readSensorDataWithMagCallb (
 
 	dataValid = true;
 	transferRunning = false;
-	mainLoopMustRun = true;
 
 /*
 	DEBUG_OUT("Sensor data with Mag, len = ");
@@ -528,9 +522,6 @@ static void readStatusRegForSensorDataCallb (
 			DEBUG_CHR_OUT('\n');
 */
 			numReadStatus = 1;
-
-			// Rewind the timer because it runs intentionally a bit faster than the sensor cycle.
-			timerReset();
 
 			if (dataBuf[0] & (1<<BMX160_STATUS_DRDY_MAG)) {
 				// Mag data are present too.
@@ -675,15 +666,13 @@ void BMX160ReadTrimRegisters()
 
 void BMX160StartDataCapturing() {
 
-	bmx160timerChainItem.callbFunc = timerTickOccurred;
-	bmx160timerChainItem.next = NULL;
-	timerAddCallback(&bmx160timerChainItem);
+	/// todo fill me
 
 }
 
 void BMX160StopDataCapturing() {
 
-	timerRemoveCallback(timerTickOccurred);
+	/// todo fill me
 
 }
 

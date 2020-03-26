@@ -52,7 +52,7 @@
 #define configMINIMAL_STACK_SIZE	( ( unsigned short ) 100 )
 #define configTOTAL_HEAP_SIZE		( (size_t ) ( 10000 ) )
 #define configMAX_TASK_NAME_LEN		( 8 )
-#define configUSE_16_BIT_TICKS		1
+#define configUSE_16_BIT_TICKS		0
 #define configIDLE_SHOULD_YIELD		0
 #define configQUEUE_REGISTRY_SIZE	0
 #define configCHECK_FOR_STACK_OVERFLOW	0
@@ -71,6 +71,7 @@
 #define configTIMER_QUEUE_LENGTH	4
 #define configTIMER_TASK_STACK_DEPTH	100
 
+#define configNUM_THREAD_LOCAL_STORAGE_POINTERS 2
 
 /* Co-routine definitions. */
 #define configUSE_CO_ROUTINES 		0

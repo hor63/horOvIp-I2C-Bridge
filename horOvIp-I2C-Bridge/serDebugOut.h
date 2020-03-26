@@ -9,8 +9,7 @@
 #ifndef SERDEBUGOUT_H_
 #define SERDEBUGOUT_H_
 
-// Including options, and uip_log if defined
-#include "uipopt.h"
+#include "config.h"
 
 #if DEBUG_PRINT
 	#define DEBUG_INIT() debugOutInit()

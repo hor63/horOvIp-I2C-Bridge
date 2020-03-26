@@ -10,7 +10,7 @@
 #include <avr/interrupt.h>
 #include <avr/sleep.h>
 
-#include "uip.h"
+#include "config.h"
 #include "serDebugOut.h"
 #include "i2c.h"
 
@@ -400,8 +400,6 @@ void I2CPoll() {
 	}
 }
 
-/// From main.c
-extern volatile bool mainLoopMustRun;
 
 /// Interrupt handler 
 ISR(TWI_vect){
@@ -578,7 +576,6 @@ ISR(TWI_vect){
 
 			transferActive = false;
 			I2CTransferFinished = true;
-			mainLoopMustRun = true;
 
 			break;
 

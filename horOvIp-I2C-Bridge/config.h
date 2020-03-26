@@ -78,28 +78,28 @@
  */
 #define DEBUG_PRINT 1
 
-/** \brief Task priority for timers for house keeping
+/** \brief Task priority for the TCP stack
  *
- * Timers have low priority. They do house keeping
+ * TCP code runs in its own task.
+ * It is CPU intensive, and runs low in order not to starve application and driver code of resources
  */
-#define TASK_PRIO_TIMERS	1
+#define TASK_PRIO_TCP		2
 
 /** \brief Task priority for the application code
  *
  */
-#define TASK_PRIO_APP		2
-
-/** \brief Task priority for the TCP stack
- *
- * TCP code runs in its own task.
- * It is CPU intensive, and runs there for below the fast drive code
- */
-#define TASK_PRIO_TCP		4
+#define TASK_PRIO_APP		3
 
 /** \brief Task priority for device drivers
  *
  * Driver code which is too large and runs too long to fit inside the ISR like the I2C driver
  */
-#define TASK_PRIO_DRIVERS	5
+#define TASK_PRIO_DRIVERS	4
+
+/** \brief Task priority for timers for signaling and blinking
+ *
+ * Timers have high priority. They do not much more than switch the LED off or on.
+ */
+#define TASK_PRIO_TIMERS	5
 
 #endif /* CONFIG_H_ */
