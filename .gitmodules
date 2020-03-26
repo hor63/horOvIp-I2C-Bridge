@@ -1,6 +1,3 @@
-[submodule "horOvIp-I2C-Bridge/uip"]
-	path = horOvIp-I2C-Bridge/uip
-	url = https://github.com/hor63/uip.git
 [submodule "horOvIp-I2C-Bridge/FreeRTOS"]
 	path = horOvIp-I2C-Bridge/FreeRTOS
 	url = https://github.com/hor63/FreeRTOS.git
