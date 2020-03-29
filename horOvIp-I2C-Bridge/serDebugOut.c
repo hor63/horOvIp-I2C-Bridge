@@ -91,7 +91,7 @@ void debugOutInit() {
 static inline bool enterCriticalSection() {
 	if (debugOutMutex) {
 		// Someone did not give up the mutex within one second. Give up, and skip debug printing.
-		if (xSemaphoreTakeRecursive (debugOutMutex,1000 / portTICK_PERIOD_MS) == pdFALSE) {
+		if (xSemaphoreTakeRecursive (debugOutMutex,pdMS_TO_TICKS(1000)) == pdFALSE) {
 			return false;
 		}
 	}

@@ -82,16 +82,16 @@ static void initTask( void *pvParameters ) {
 	tcpip_init(NULL, NULL);
 
 	// Let other components start up safely, particularly the IMU but also other sensors
-	vTaskDelay(1000 / portTICK_PERIOD_MS);
+	vTaskDelay(pdMS_TO_TICKS(1000));
 
 	BMX160Init();
 
 	// Let the data capturing get into the swing
-	vTaskDelay(200 / portTICK_PERIOD_MS);
+	vTaskDelay(pdMS_TO_TICKS(200));
 
 	BMX160StartDataCapturing();
 
-	xSemaphoreTake(tcpStartSem,10000/portTICK_PERIOD_MS);
+	xSemaphoreTake(tcpStartSem,pdMS_TO_TICKS(10000));
 
 	// Initialize PPP and startup the PPP listener.
 	pppAppInit();
@@ -99,7 +99,7 @@ static void initTask( void *pvParameters ) {
 	DEBUG_OUT("STARTUP done\n");
 
 	// And wait 500ms
-	vTaskDelay(500 / portTICK_PERIOD_MS);
+	vTaskDelay(pdMS_TO_TICKS(500));
 
 	// Terminate yourself
 	vTaskDelete(NULL);
