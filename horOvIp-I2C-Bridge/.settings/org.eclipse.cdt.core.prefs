@@ -9,6 +9,11 @@ environment/project/cdt.managedbuild.config.gnu.cross.exe.debug.696302089/PATH/o
 environment/project/cdt.managedbuild.config.gnu.cross.exe.debug.696302089/PATH/value=C\:\\Programs\\AtmelStudio\\toolchain\\avr8\\avr8-gnu-toolchain\\bin;C\:\\Program Files (x86)\\Atmel\\Studio\\7.0\\shellutils;c\:\\Windows;c\:\\windows\\system32
 environment/project/cdt.managedbuild.config.gnu.cross.exe.debug.696302089/append=true
 environment/project/cdt.managedbuild.config.gnu.cross.exe.debug.696302089/appendContributed=true
+environment/project/cdt.managedbuild.config.gnu.cross.exe.release.1625647803/PATH/delimiter=;
+environment/project/cdt.managedbuild.config.gnu.cross.exe.release.1625647803/PATH/operation=replace
+environment/project/cdt.managedbuild.config.gnu.cross.exe.release.1625647803/PATH/value=C\:\\Programs\\AtmelStudio\\toolchain\\avr8\\avr8-gnu-toolchain\\bin;C\:\\Program Files (x86)\\Atmel\\Studio\\7.0\\shellutils;c\:\\Windows;c\:\\windows\\system32
+environment/project/cdt.managedbuild.config.gnu.cross.exe.release.1625647803/append=true
+environment/project/cdt.managedbuild.config.gnu.cross.exe.release.1625647803/appendContributed=true
 indexer/indexAllFiles=true
 indexer/indexAllHeaderVersions=false
 indexer/indexAllVersionsSpecificHeaders=
