@@ -9,6 +9,8 @@
 #include "netif/ppp/pppos.h"
 #include "netif/ppp/pppapi.h"
 
+#include "PPP/ppp_usart_atmega.h"
+
 
 /* The PPP control block */
 static ppp_pcb *ppp;
@@ -16,21 +18,6 @@ static ppp_pcb *ppp;
 /* The PPP IP interface */
 static struct netif ppp_netif;
 
-
-/**
- * \brief PPPoS serial output callback
- *
- * @param pcb PPP control block
- * @param data buffer to write to serial port
- * @param len length of the data buffer
- * @param ctx optional user-provided callback context pointer
- * @return len if write succeed
- */
-static u32_t output_cb(ppp_pcb *pcb, u8_t *data, u32_t len, void *ctx) {
-
-	/// todo: fill me
-	return 0; // uart_write(UART, data, len);
-}
 
 static void ppp_notify_phase_cb(ppp_pcb *pcb, u8_t phase, void *ctx) {
   switch (phase) {
@@ -78,11 +65,11 @@ static void status_cb(ppp_pcb *pcb, int err_code, void *ctx) {
 #if LWIP_DNS
       const ip_addr_t *ns;
 #endif /* LWIP_DNS */
-      printf("status_cb: Connected\n");
+//      printf("status_cb: Connected\n");
 #if PPP_IPV4_SUPPORT
-      printf("   our_ipaddr  = %s\n", ipaddr_ntoa(&pppif->ip_addr));
-      printf("   his_ipaddr  = %s\n", ipaddr_ntoa(&pppif->gw));
-      printf("   netmask     = %s\n", ipaddr_ntoa(&pppif->netmask));
+//      printf("   our_ipaddr  = %s\n", ipaddr_ntoa(&pppif->ip_addr));
+//      printf("   his_ipaddr  = %s\n", ipaddr_ntoa(&pppif->gw));
+//      printf("   netmask     = %s\n", ipaddr_ntoa(&pppif->netmask));
 #if LWIP_DNS
       ns = dns_getserver(0);
       printf("   dns1        = %s\n", ipaddr_ntoa(ns));
@@ -184,7 +171,7 @@ void pppAppInit() {
 	 * ctx_cb, optional user-provided callback context pointer
 	 */
 	ppp = pppapi_pppos_create(&ppp_netif,
-	       output_cb, status_cb, NULL);
+			PPPUsartSend, status_cb, NULL);
 
 	/*
 	 * Initiate PPP server listener
@@ -221,6 +208,14 @@ void pppAppInit() {
 
 	/* Require peer to authenticate */
 	ppp_set_auth_required(ppp, 1);
+
+	pppapi_set_notify_phase_callback(ppp, ppp_notify_phase_cb);
+
+	// Setup the serial port.
+	PPPUsartInit();
+
+	// ... and startup the receiver
+	PPPUsartStart(ppp);
 
 	/*
 	 * Only for PPPoS, the PPP session should be up and waiting for input.
