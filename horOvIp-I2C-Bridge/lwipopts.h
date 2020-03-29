@@ -69,13 +69,14 @@
 #define PAP_SUPPORT                     1
 #define CHAP_SUPPORT                    1
 #define MSCHAP_SUPPORT                  0
-#define EAP_SUPPORT                     1
+#define EAP_SUPPORT                     0
 #define PPP_SERVER                      1
 #define PPP_OUR_NAME                    "horOVSensBox"
 #define PPP_NOTIFY_PHASE                1
-
-
-
+#define PPP_MRU                         250
+#define PPP_DEFMRU                      250
+// #define CCP_SUPPORT						1
+// #define DEFLATE_SUPPORT					1
 
 // Work-around of socket ioctl macros which cannot be determined by avr-gcc
 // I let the macros in sockets.h be calculated by a X64_86 gcc, and fill in the constants directly here.
