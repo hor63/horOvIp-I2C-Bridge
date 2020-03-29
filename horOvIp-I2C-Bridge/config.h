@@ -31,41 +31,23 @@
  */
 #define BMX160ODR 50
 
-/** \brief uIP periodic poll frequency in Hz
+/** 
+ * Buffer size for the PPP receive and send buffers
  *
  */
-#define UIP_PERIODIC_POLL_FREQUENCY 4
+#define PPP_BUFFER_SIZE 512
 
 /** 
- * Buffer size for the SLIP receive and send buffers as well as the uIP buffer
- *
- * This is 100 bytes application data. The rest is IP and TCP headers.
- * \see UIP_CONF_BUFFER_SIZE
- */
-#define IP_BUFFER_SIZE 220
-
-/** Number of SLIP receive buffers
- * Since the number of concurrent IP connections is 4 I provide 4 buffers
- *
- * \see UIP_CONF_MAX_CONNECTIONS
- */
-#define SLIP_NUM_IP_RECV_BUFFERS 4
-
-
-/** Number of SLIP send buffers
- * Since the number of concurrent IP connections is 4 I provide 4 buffers
- *
- * \see UIP_CONF_MAX_CONNECTIONS
- */
-#define SLIP_NUM_IP_SEND_BUFFERS 4
-
-/** 
- * Baud rate for the SLIP serial connection.
+ * Baud rate for the PPP serial connection.
  *
  * Please note that the other serial parameters are fixed by the SLIP standard to 8,n,1
  */
-#define SLIP_BAUD_RATE 115200UL
-// #define SLIP_BAUD_RATE 19200UL
+#define PPP_BAUD_RATE 115200UL
+
+/** \brief Timeout of the serial reader after which an incomplete frame is handed to PPP in ms
+ *
+ */
+#define PPP_READ_TIMEOUT_INCOMPLETE_FRAME_MS 20
 
 /**
  * Baud rate of the debugging port
