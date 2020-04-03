@@ -18,6 +18,7 @@
 #include "semphr.h"
 
 #include "lwip/tcpip.h"
+#include "netif/ppp/pppapi.h"
 
 #include "PPP/PPPApp.h"
 
@@ -29,7 +30,9 @@
 
 static void initTask( void *pvParameters );
 static void vTestTimerFunction( TimerHandle_t xTimer );
+static void vStatisticsTimerFunction( TimerHandle_t xTimer );
 static TimerHandle_t testTimer;
+static TimerHandle_t statisticsTimer;
 
 int main(void) {
 	
@@ -54,9 +57,11 @@ int main(void) {
 	// Enable sleep here. The idle hook will sleep the processor
 	sleep_enable();
 
-	xTaskCreate( initTask, "Init", configMINIMAL_STACK_SIZE, NULL, TASK_PRIO_APP, NULL );
+	xTaskCreate( initTask, "Init", configMINIMAL_STACK_SIZE * 2, NULL, TASK_PRIO_APP, NULL );
 	testTimer = xTimerCreate("Blinky",33,pdTRUE,vTestTimerFunction,vTestTimerFunction);
+	statisticsTimer = xTimerCreate("Statistics",pdMS_TO_TICKS(5000),pdTRUE,vStatisticsTimerFunction,vStatisticsTimerFunction);
 	xTimerStart(testTimer,10);
+	xTimerStart(statisticsTimer,10);
 
 	// Set the direction of the LED pin output
 	DDRB |= _BV(DDB2);
@@ -68,6 +73,9 @@ int main(void) {
 void tcpipInitDoneCb (void* d) {
 	SemaphoreHandle_t sem = (SemaphoreHandle_t) d;
 
+	// Initialize PPP and startup the PPP listener.
+	pppAppInit();
+
 	xSemaphoreGive(sem);
 
 }
@@ -75,28 +83,38 @@ void tcpipInitDoneCb (void* d) {
 static void initTask( void *pvParameters ) {
 
 	DEBUG_INIT();
-	DEBUG_OUT("\n\nhorOV IMU board V0.2\n");
+
+	DEBUG_OUT_START_MSG();
+	DEBUG_OUT("horOV IMU board V0.2");
+	DEBUG_OUT_END_MSG();
 
 	SemaphoreHandle_t tcpStartSem = xSemaphoreCreateBinary();
-
-	tcpip_init(NULL, NULL);
 
 	// Let other components start up safely, particularly the IMU but also other sensors
 	vTaskDelay(pdMS_TO_TICKS(1000));
 
-	BMX160Init();
+	//BMX160Init();
 
 	// Let the data capturing get into the swing
 	vTaskDelay(pdMS_TO_TICKS(200));
 
-	BMX160StartDataCapturing();
+	//BMX160StartDataCapturing();
+
+	DEBUG_OUT_START_MSG();
+	DEBUG_OUT("Startup TCPIP");
+	DEBUG_OUT_END_MSG();
+
+	vTaskDelay(pdMS_TO_TICKS(200));
+
+
+	tcpip_init(tcpipInitDoneCb, tcpStartSem);
+
 
 	xSemaphoreTake(tcpStartSem,pdMS_TO_TICKS(10000));
 
-	// Initialize PPP and startup the PPP listener.
-	pppAppInit();
-
-	DEBUG_OUT("STARTUP done\n");
+	DEBUG_OUT_START_MSG();
+	DEBUG_OUT("STARTUP done");
+	DEBUG_OUT_END_MSG();
 
 	// And wait 500ms
 	vTaskDelay(pdMS_TO_TICKS(500));
@@ -110,6 +128,31 @@ static void vTestTimerFunction( TimerHandle_t xTimer ) {
 
 	// Toggle the pin
 	PINB = _BV(PINB2);
+
+}
+
+static HeapStats_t heapStats;
+
+static void vStatisticsTimerFunction( TimerHandle_t xTimer ) {
+
+	vPortGetHeapStats(&heapStats);
+
+	DEBUG_OUT("LargestFreeBlock = ");
+	DEBUG_UINT_OUT(heapStats.xSizeOfLargestFreeBlockInBytes);
+	DEBUG_OUT("\r\n SmallestFreeBlock= ");
+	DEBUG_UINT_OUT(heapStats.xSizeOfSmallestFreeBlockInBytes);
+	DEBUG_OUT("\r\nNumFreeBlocks = ");
+	DEBUG_UINT_OUT(heapStats.xNumberOfFreeBlocks);
+
+	DEBUG_OUT("\r\nFreeSpace = ");
+	DEBUG_UINT_OUT(heapStats.xAvailableHeapSpaceInBytes);
+	DEBUG_OUT("\r\nSuccessAllocations = ");
+	DEBUG_UINT_OUT(heapStats.xNumberOfSuccessfulAllocations);
+	DEBUG_OUT("\r\nSuccessFrees = ");
+	DEBUG_UINT_OUT(heapStats.xNumberOfSuccessfulFrees);
+	DEBUG_OUT("\r\nMinEverSpace = ");
+	DEBUG_UINT_OUT(heapStats.xMinimumEverFreeBytesRemaining);
+	DEBUG_OUT("\r\n\r\n");
 
 }
 
@@ -136,7 +179,7 @@ static bool processTCPMessage(void const *data,size_t len) {
 	uip_appdata pointer. The size of the data is
 	* available through the uip_len
 	*/
-	struct BMX160RecvData *recvData = (struct BMX160RecvData const *)data;
+	struct BMX160RecvData const *recvData = (struct BMX160RecvData const *)data;
 	struct BMX160Data* bmxData;
 	
 	if (len == recvData->header.length) {
@@ -171,10 +214,10 @@ static bool processTCPMessage(void const *data,size_t len) {
 				BMX160ReadTrimRegisters();
 				bmxData = BMX160GetData();
 				
-				if (uip_mss() >= bmxData->header.length) {
-					uip_send (bmxData,bmxData->header.length);
+//				if (uip_mss() >= bmxData->header.length) {
+//					uip_send (bmxData,bmxData->header.length);
 					rc = true;
-				}
+//				}
 				
 				// restart the data capture
 				BMX160StartDataCapturing();

@@ -84,4 +84,6 @@
  */
 #define TASK_PRIO_TIMERS	5
 
+#define configMINIMAL_STACK_SIZE	( ( unsigned short ) 200 )
+
 #endif /* CONFIG_H_ */

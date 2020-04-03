@@ -10,9 +10,13 @@
 
 /** \brief Initialize PPP
  *
+ * *IMPORTANT*: This function *must* be called from within the lwip task!
+ * Ideally call it from the tcpip_init_done_fn callback when calling tcpip_init.
+ *
  * Sets up PPP.
  * Startup PPP in listen mode. First try to establish the connection.
  * Afterwards enter the listen mode if the connection was not established.
+ *
  */
 void pppAppInit();
 

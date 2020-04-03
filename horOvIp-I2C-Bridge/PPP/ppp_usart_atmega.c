@@ -21,6 +21,8 @@
 #include "semphr.h"
 #include "timers.h"
 
+#include "serDebugOut.h"
+
 /// The term "(F_CPU + SLIP_BAUD_RATE*8)" rounds the UBRR value to the next integer
 #define USART_BAUD_CONFIG_VAL (((F_CPU + PPP_BAUD_RATE*8)/(16*PPP_BAUD_RATE))-1)
 /// Calculate the actual baud rate in mHz
@@ -107,7 +109,9 @@ static TPPPBufferIndex writeBufferDataStart = 0;
 static TPPPBufferIndex numInWriteBuffer = 0;
 
 /// \brief Exclusive entry into \ref PPPUsartSend
-static SemaphoreHandle_t writeMutex = 0;
+volatile uint32_t ppp_usart_atmegaGuard1 = 0;
+SemaphoreHandle_t ppp_usart_atmegaWriteMutex = (SemaphoreHandle_t)0;
+volatile uint32_t ppp_usart_atmegaGuard2 = 0;
 
 /// Task handle of a task waiting for free space in the send buffer
 static TaskHandle_t waitingWriteTask = 0;
@@ -137,8 +141,8 @@ static inline void initWriteBuffer() {
 
 void PPPUsartInit() {
 
-	if (writeMutex == NULL) {
-		writeMutex = xSemaphoreCreateMutex();
+	if (ppp_usart_atmegaWriteMutex == NULL) {
+		ppp_usart_atmegaWriteMutex = xSemaphoreCreateMutex();
 	}
 
 	memset((void*)readBuffer,0,sizeof(readBuffer));
@@ -192,10 +196,9 @@ void PPPUsartInit() {
 
 void PPPUsartStart(ppp_pcb *ppp) {
 
-
 	initReadBuffer();
 
-	xTaskCreate(readerTaskFunc,"PPPReadTask",configMINIMAL_STACK_SIZE,ppp,TASK_PRIO_DRIVERS,&readDriverTask);
+	xTaskCreate(readerTaskFunc,"PPPReadTask",configMINIMAL_STACK_SIZE*2,ppp,TASK_PRIO_DRIVERS,&readDriverTask);
 
 	taskENTER_CRITICAL();
 
@@ -231,6 +234,8 @@ void PPPUsartStop() {
 	taskEXIT_CRITICAL();
 }
 
+void debugAssertOut(const char* assertText,const char* filename,int line);
+
 /**
  * \brief PPPoS serial output callback
  *
@@ -250,15 +255,24 @@ TPPPBufferIndex lNumInWriteBuffer;
 		return 0;
 	}
 
-	if (xSemaphoreTake(writeMutex,pdMS_TO_TICKS(5000)) != pdTRUE) {
+	if (ppp_usart_atmegaGuard1 != 0) {
+		debugAssertOut("Guard 1 modified","Guard1 ppp_usart_atmega.c",__LINE__);
+	}
+	if (ppp_usart_atmegaGuard2 != 0) {
+		debugAssertOut("Guard 2 modified","Guard2 ppp_usart_atmega.c",__LINE__);
+	}
+
+	if (xSemaphoreTake(ppp_usart_atmegaWriteMutex,pdMS_TO_TICKS(5000)) != pdTRUE) {
 		// Someone is blocking the sender overly long
 		// should never happen. This should be the callback from the LWIP task only
+		DEBUG_OUT("Send: Mutex timeout\r\n");
 		return 0;
 	}
 
 	for (;;) {
 		// Get a local snapshot of the administrative data
 		portENTER_CRITICAL();
+		waitingWriteTask = NULL;
 		portMEMORY_BARRIER();
 		lWriteBufferDataStart = writeBufferDataStart;
 		lWriteBufferFreeStart = writeBufferFreeStart;
@@ -267,7 +281,7 @@ TPPPBufferIndex lNumInWriteBuffer;
 		// Is there space in the buffer at all?
 		if (lNumInWriteBuffer < PPP_BUFFER_SIZE) {
 			TPPPBufferIndex lenToWrite;
-			if (lWriteBufferFreeStart > lWriteBufferDataStart) {
+			if (lWriteBufferFreeStart >= lWriteBufferDataStart) {
 				// The free space wraps around the buffer end.
 				if ((PPP_BUFFER_SIZE - lWriteBufferFreeStart) < remainingLen) {
 					lenToWrite = PPP_BUFFER_SIZE - lWriteBufferFreeStart;
@@ -283,6 +297,10 @@ TPPPBufferIndex lNumInWriteBuffer;
 				}
 			} // if (lWriteBufferFreeStart > lWriteBufferDataStart)
 
+			if ((lWriteBufferFreeStart + lenToWrite) > PPP_BUFFER_SIZE) {
+				debugAssertOut("Buffer exceeded","Write buffer exceeded ppp_usart_atmega.c",__LINE__);
+			}
+
 			memcpy (writeBuffer + lWriteBufferFreeStart,data,lenToWrite);
 
 			// Adjust the administration
@@ -295,7 +313,7 @@ TPPPBufferIndex lNumInWriteBuffer;
 			numInWriteBuffer += lenToWrite;
 			remainingLen -= lenToWrite;
 
-			if (numInWriteBuffer == 0 && remainingLen > 0) {
+			if (numInWriteBuffer == PPP_BUFFER_SIZE && remainingLen > 0) {
 				waitingWriteTask = xTaskGetCurrentTaskHandle();
 				xTaskNotifyStateClear(waitingWriteTask);
 			}
@@ -304,24 +322,29 @@ TPPPBufferIndex lNumInWriteBuffer;
 			portMEMORY_BARRIER();
 			portEXIT_CRITICAL();
 
+			// Enable the send buffer empty interrupt thus starting the sender
+			UCSR0B |= _BV(UDRIE0);
+
 			if (remainingLen == 0) {
 				// Leave the loop. You are done here.
 				break;
 			}
 
-			// Enable the send buffer empty interrupt thus starting the sender
-			UCSR0B |= _BV(UDRIE0);
-
 			if (waitingWriteTask) {
 				// Wait for the write ISR to empty the buffer
-				// Or just try again after 20ms.
-				ulTaskNotifyTake(pdTRUE,pdMS_TO_TICKS(20));
+				// Or just try again after 100ms.
+				ulTaskNotifyTake(pdTRUE,pdMS_TO_TICKS(100));
 			}
+
 		}
 
 	}
 
-	xSemaphoreGive(writeMutex);
+//	DEBUG_OUT("Send: ");
+//	DEBUG_INT_OUT((int)len);
+//	DEBUG_OUT("\r\n");
+
+	xSemaphoreGive(ppp_usart_atmegaWriteMutex);
 	return len;
 }
 
@@ -332,28 +355,33 @@ static void readerTaskFunc(void* ctx) {
 	TPPPBufferIndex lReadBufferDataStart;
 	TPPPBufferIndex lNumInReadBuffer;
 
+
 	for (;;) {
+		// uint32_t taskNotifyRC = ulTaskNotifyTake(pdTRUE,pdMS_TO_TICKS(1000));
 		ulTaskNotifyTake(pdTRUE,pdMS_TO_TICKS(100));
 
-		// Inner loop until the complete input buffer is cleared
-		for (;;) {
-			TPPPBufferIndex readBlockLen;
-			portENTER_CRITICAL();
-			lReadBufferFreeStart = readBufferFreeStart;
-			lReadBufferDataStart = readBufferDataStart;
-			lNumInReadBuffer = numInReadBuffer;
-			portEXIT_CRITICAL();
+		TPPPBufferIndex readBlockLen;
+		portENTER_CRITICAL();
+		lReadBufferFreeStart = readBufferFreeStart;
+		lReadBufferDataStart = readBufferDataStart;
+		lNumInReadBuffer = numInReadBuffer;
+		portEXIT_CRITICAL();
 
-			if (lNumInReadBuffer == 0) {
-				break;
-			}
-
+		if (lNumInReadBuffer > 0) {
 			if (lReadBufferDataStart > lReadBufferFreeStart) {
 				// There is a wrap-around in the read data
 				readBlockLen = PPP_BUFFER_SIZE - lReadBufferDataStart;
 			} else {
 				readBlockLen = numInReadBuffer;
 			}
+
+//			if (taskNotifyRC == 0) {
+//				DEBUG_OUT("ReciveTO: ");
+//			} else {
+//				DEBUG_OUT("Recive: ");
+//			}
+//			DEBUG_INT_OUT((int)readBlockLen);
+//			DEBUG_OUT("\r\n");
 
 			pppos_input_tcpip(ppp,readBuffer + lReadBufferDataStart,readBlockLen);
 
@@ -365,8 +393,7 @@ static void readerTaskFunc(void* ctx) {
 			}
 			portMEMORY_BARRIER();
 			portEXIT_CRITICAL();
-
-		} // for (;;) - Inner loop to read out the input buffer
+		}
 
 	} // for (;;) - Outer loop endless
 }
@@ -401,12 +428,14 @@ ISR(USART0_RX_vect) {
 				wakeReaderTask = true;
 			}
 
-			if (recvChar == PPP_FLAG_SEQUENCE ||
-					numInReadBuffer >= (PPP_BUFFER_SIZE/2)) {
+			if (numInReadBuffer >= (PPP_BUFFER_SIZE/2) ||
+				// Do not notify when the flag sequence is the only character in the buffer.
+				(recvChar == PPP_FLAG_SEQUENCE && numInReadBuffer >= 2)) {
 				// A frame start/end/separator: Trigger the reader task
 				// The read buffer is half full: Trigger the reader task too.
 				wakeReaderTask = true;
 			}
+
 		}
 		// Read the status register for the next iteration.
 		statusRegA = UCSR0A;
@@ -415,10 +444,12 @@ ISR(USART0_RX_vect) {
 	if (wakeReaderTask) {
 		higherPrioTaskWoken = pdFALSE;
 		vTaskNotifyGiveFromISR(readDriverTask,&higherPrioTaskWoken);
+#if configUSE_PREEMPTION
 		if (higherPrioTaskWoken != pdFALSE) {
 			portMEMORY_BARRIER();
 			vPortYield();
 		}
+#endif
 	}
 }
 
@@ -449,9 +480,11 @@ ISR(USART0_UDRE_vect) {
 		vTaskNotifyGiveFromISR(waitingWriteTask,&higherPrioTaskWoken);
 		waitingWriteTask = 0;
 
+#if configUSE_PREEMPTION
 		if (higherPrioTaskWoken != pdFALSE) {
 			portMEMORY_BARRIER();
 			vPortYield();
 		}
+#endif
 	}
 }

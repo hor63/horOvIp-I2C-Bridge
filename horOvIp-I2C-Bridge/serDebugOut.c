@@ -37,13 +37,8 @@ static uint8_t outBuf[256];
 static uint8_t currOutIndex = 0;
 static uint8_t nextFreeIndex = 0;
 
-static SemaphoreHandle_t debugOutMutex = NULL;
-
 void debugOutInit() {
 	
-	// Create the semaphore for synchronized access
-	debugOutMutex = xSemaphoreCreateRecursiveMutex();
-
 	// Setup the serial port USART1
 
 	// Setup the baud rate.
@@ -88,24 +83,6 @@ void debugOutInit() {
 
 }
 
-static inline bool enterCriticalSection() {
-	if (debugOutMutex) {
-		// Someone did not give up the mutex within one second. Give up, and skip debug printing.
-		if (xSemaphoreTakeRecursive (debugOutMutex,pdMS_TO_TICKS(1000)) == pdFALSE) {
-			return false;
-		}
-	}
-	return true;
-}
-
-static inline void leaveCriticalSection() {
-	if (debugOutMutex) {
-		// Someone did not give up the mutex within one second. Give up, and skip debug printing.
-		xSemaphoreGiveRecursive (debugOutMutex);
-	}
-}
-
-
 static inline void activateSender() {
 	// Activate the Send buffer empty interrupt
 	UCSR1B |= _BV(UDRIE1);
@@ -122,10 +99,34 @@ static inline void advanceBufferStart() {
 	}
 }
 
-void debugOutStr(const char* str) {
-	bool strNotEmpty = false;
+void debugOutStartMsg(){
+static TaskStatus_t ts;
+	portENTER_CRITICAL();
 
-	enterCriticalSection();
+	vTaskGetInfo(NULL,&ts,pdFALSE,eInvalid);
+	debugOutStr("Task ");
+	debugOutStr(ts.pcTaskName);
+	debugOutChr(':');
+	portEXIT_CRITICAL();
+}
+
+/** Print CR-LF and unlock the module for printing by other tasks \n
+ * Complements \ref debugOutStartMsg
+ */
+void debugOutEndMsg(){
+
+	debugOutStr("\r\n");
+
+}
+
+void debugOutStr(const char* str) {
+	portENTER_CRITICAL();
+	debugOutStrFromISR(str);
+	portEXIT_CRITICAL();
+}
+
+void debugOutStrFromISR(const char* str) {
+	bool strNotEmpty = false;
 
 	while (*str) {
 		outBuf[nextFreeIndex] = *str;
@@ -138,12 +139,10 @@ void debugOutStr(const char* str) {
 	if (strNotEmpty) {
 		activateSender();
 	}
-	
-	leaveCriticalSection();
 }
 
 void debugOutChr(char chr) {
-	enterCriticalSection();
+	portENTER_CRITICAL();
 	
 	if (chr) {
 		outBuf[nextFreeIndex] = chr;
@@ -152,19 +151,19 @@ void debugOutChr(char chr) {
 		activateSender();
 	}
 
-	leaveCriticalSection();
+	portEXIT_CRITICAL();
 }
 
 void debugOutInt(int val) {
-	enterCriticalSection();
+	portENTER_CRITICAL();
 	debugOutStr(itoa(val,convertBuf,10));
-	leaveCriticalSection();
+	portEXIT_CRITICAL();
 }
 
 void debugOutUInt(unsigned int val) {
-	enterCriticalSection();
+	portENTER_CRITICAL();
 	debugOutStr(utoa(val,convertBuf,10));
-	leaveCriticalSection();
+	portEXIT_CRITICAL();
 }
 
 static const char hexNibbleVal[] = {
@@ -172,25 +171,17 @@ static const char hexNibbleVal[] = {
 };
 
 void debugOutByteHex(unsigned char val) {
-	enterCriticalSection();
+	portENTER_CRITICAL();
 	debugOutChr(hexNibbleVal[val>>4]);
 	debugOutChr(hexNibbleVal[val&0x0f]);
-	leaveCriticalSection();
+	portEXIT_CRITICAL();
 }
 
 
 void debugOutUIntHex(unsigned int val) {
-	enterCriticalSection();
+	portENTER_CRITICAL();
 	debugOutStr(utoa(val,convertBuf,16));
-	leaveCriticalSection();
-}
-
-void uip_log(char *msg) {
-	enterCriticalSection();
-	debugOutStr(msg);
-	debugOutChr('\n');
-	leaveCriticalSection();
-
+	portEXIT_CRITICAL();
 }
 
 // The send buffer is ready to take another byte to be sent
@@ -203,5 +194,39 @@ ISR(USART1_UDRE_vect) {
  		// Disable the send buffer empty interrupt
  		UCSR1B &= ~_BV(UDRIE1);
 	}
+	
+}
+
+void debugAssertOut(const char* assertText,const char* filename,int line) {
+	portENTER_CRITICAL();
+	const char* basename = filename;
+	for (;*filename == 0; filename++) {
+		if (*filename == '\\' || *filename == '/') {
+			basename = filename + 1;
+		}
+	}
+	debugOutStr(basename);
+	debugOutChr(':');
+	debugOutInt(line);
+	debugOutStr(" Assertion");
+//	debugOutStr(assertText);
+	debugOutStr("\r\n");
+	portEXIT_CRITICAL();
+}
+
+void vApplicationStackOverflowHook( TaskHandle_t xTask,
+                                    signed char *pcTaskName ) {
+	(void) xTask;
+
+	portENTER_CRITICAL();
+	debugOutStr("!!!Stack overflow !!! Task ");
+	debugOutStr((const char *)pcTaskName);
+	debugOutStr("\r\n");
+	portEXIT_CRITICAL();
+}
+
+void vApplicationMallocFailedHook( void ){
+
+	debugOutStrFromISR("\r\n!!!Malloc FAILED!!!\r\n");
 	
 }

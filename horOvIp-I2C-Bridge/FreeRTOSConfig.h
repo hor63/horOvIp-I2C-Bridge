@@ -31,6 +31,8 @@
 #include "config.h"
 #include <avr/io.h>
 
+#include "serDebugOut.h"
+
 /*-----------------------------------------------------------
  * Application specific definitions.
  *
@@ -49,18 +51,20 @@
 #define configCPU_CLOCK_HZ			F_CPU
 #define configTICK_RATE_HZ			( ( TickType_t ) 200 )
 #define configMAX_PRIORITIES		( 6 )
-#define configMINIMAL_STACK_SIZE	( ( unsigned short ) 100 )
-#define configTOTAL_HEAP_SIZE		( (size_t ) ( 10000 ) )
-#define configMAX_TASK_NAME_LEN		( 8 )
+// In config.h
+// #define configMINIMAL_STACK_SIZE	( ( unsigned short ) 400 )
+#define configTOTAL_HEAP_SIZE		( (size_t ) (  10000 ) )
+#define configMAX_TASK_NAME_LEN		( 16 )
 #define configUSE_16_BIT_TICKS		0
 #define configIDLE_SHOULD_YIELD		0
 #define configQUEUE_REGISTRY_SIZE	0
-#define configCHECK_FOR_STACK_OVERFLOW	0
+#define configCHECK_FOR_STACK_OVERFLOW	1
+#define configUSE_MALLOC_FAILED_HOOK 1
 
 #define configSUPPORT_STATIC_ALLOCATION 0
 #define configSUPPORT_DYNAMIC_ALLOCATION 1
 
-#define configUSE_TRACE_FACILITY	0
+#define configUSE_TRACE_FACILITY	1
 #define configUSE_MUTEXES			1
 #define configUSE_RECURSIVE_MUTEXES	1
 #define configUSE_COUNTING_SEMAPHORES	1
@@ -72,6 +76,10 @@
 #define configTIMER_TASK_STACK_DEPTH	100
 
 #define configNUM_THREAD_LOCAL_STORAGE_POINTERS 2
+
+#define configASSERT(x) \
+	do {if((x)==0) {debugAssertOut("Assert",__FILE__, __LINE__ );}} while (0)
+//	do {if((x)==0) {debugAssertOut(#x,__FILE__, __LINE__ );}} while (0)
 
 /* Co-routine definitions. */
 #define configUSE_CO_ROUTINES 		0

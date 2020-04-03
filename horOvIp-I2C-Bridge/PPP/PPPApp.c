@@ -5,6 +5,13 @@
  *      Author: kai_horstmann
  */
 
+#include <string.h>
+
+#include "serDebugOut.h"
+
+#include "FreeRTOS.h"
+#include "task.h"
+
 #include "lwip/tcpip.h"
 #include "netif/ppp/pppos.h"
 #include "netif/ppp/pppapi.h"
@@ -23,28 +30,73 @@ static void ppp_notify_phase_cb(ppp_pcb *pcb, u8_t phase, void *ctx) {
   switch (phase) {
 
   /* Session is down (either permanently or briefly) */
+  DEBUG_OUT_START_MSG();
+
   case PPP_PHASE_DEAD:
+     DEBUG_OUT("PPP phase DEAD");
 //    led_set(PPP_LED, LED_OFF);
     break;
 
   /* We are between two sessions */
   case PPP_PHASE_HOLDOFF:
+     DEBUG_OUT("PPP phase HOLDOFF");
 //    led_set(PPP_LED, LED_SLOW_BLINK);
     break;
 
   /* Session just started */
   case PPP_PHASE_INITIALIZE:
+     DEBUG_OUT("PPP phase INITIALIZE");
 //    led_set(PPP_LED, LED_FAST_BLINK);
     break;
 
   /* Session is running */
   case PPP_PHASE_RUNNING:
+     DEBUG_OUT("PPP phase RUNNING");
 //    led_set(PPP_LED, LED_ON);
     break;
+	
+  case PPP_PHASE_MASTER:
+	  DEBUG_OUT("PPP phase MASTER");
+	  break;
+
+  case PPP_PHASE_SERIALCONN:
+	  DEBUG_OUT("PPP phase SERIALCONN");
+	  break;
+
+  case PPP_PHASE_DORMANT:
+	  DEBUG_OUT("PPP phase DORMANT");
+	  break;
+
+  case PPP_PHASE_ESTABLISH:
+	  DEBUG_OUT("PPP phase ESTABLISH");
+	  break;
+
+  case PPP_PHASE_AUTHENTICATE:
+	  DEBUG_OUT("PPP phase AUTHENTICATE");
+	  break;
+
+  case PPP_PHASE_CALLBACK:
+	  DEBUG_OUT("PPP phase CALLBACK");
+	  break;
+
+  case PPP_PHASE_NETWORK:
+	  DEBUG_OUT("PPP phase NETWORK");
+	  break;
+
+  case PPP_PHASE_TERMINATE:
+	  DEBUG_OUT("PPP phase ");
+	  break;
+
+  case PPP_PHASE_DISCONNECT:
+	  DEBUG_OUT("PPP phase ");
+	  break;
 
   default:
+     DEBUG_OUT("PPP unkown phase ");
+	 DEBUG_INT_OUT((int)phase);
     break;
   }
+  DEBUG_OUT_END_MSG();
 }
 
 /*
@@ -65,6 +117,9 @@ static void status_cb(ppp_pcb *pcb, int err_code, void *ctx) {
 #if LWIP_DNS
       const ip_addr_t *ns;
 #endif /* LWIP_DNS */
+      DEBUG_OUT_START_MSG();
+      DEBUG_OUT("PPP status PPPERR_NONE: Connected");
+      DEBUG_OUT_END_MSG();
 //      printf("status_cb: Connected\n");
 #if PPP_IPV4_SUPPORT
 //      printf("   our_ipaddr  = %s\n", ipaddr_ntoa(&pppif->ip_addr));
@@ -83,54 +138,94 @@ static void status_cb(ppp_pcb *pcb, int err_code, void *ctx) {
       break;
     }
     case PPPERR_PARAM: {
+        DEBUG_OUT_START_MSG();
+        DEBUG_OUT("PPP status PPPERR_PARAM: Invalid parameter");
+        DEBUG_OUT_END_MSG();
 //      printf("status_cb: Invalid parameter\n");
       break;
     }
     case PPPERR_OPEN: {
+        DEBUG_OUT_START_MSG();
+        DEBUG_OUT("PPP status PPPERR_OPEN: Unable to open PPP session");
+        DEBUG_OUT_END_MSG();
 //      printf("status_cb: Unable to open PPP session\n");
       break;
     }
     case PPPERR_DEVICE: {
+        DEBUG_OUT_START_MSG();
+        DEBUG_OUT("PPP status PPPERR_DEVICE: Invalid I/O device for PPP");
+        DEBUG_OUT_END_MSG();
 //      printf("status_cb: Invalid I/O device for PPP\n");
       break;
     }
     case PPPERR_ALLOC: {
+        DEBUG_OUT_START_MSG();
+        DEBUG_OUT("PPP status PPPERR_ALLOC: Unable to allocate resources");
+        DEBUG_OUT_END_MSG();
 //      printf("status_cb: Unable to allocate resources\n");
       break;
     }
     case PPPERR_USER: {
+        DEBUG_OUT_START_MSG();
+        DEBUG_OUT("PPP status PPPERR_USER: User interrupt");
+        DEBUG_OUT_END_MSG();
 //      printf("status_cb: User interrupt\n");
       break;
     }
     case PPPERR_CONNECT: {
+        DEBUG_OUT_START_MSG();
+        DEBUG_OUT("PPP status PPPERR_CONNECT: Connection lost");
+        DEBUG_OUT_END_MSG();
 //      printf("status_cb: Connection lost\n");
       break;
     }
     case PPPERR_AUTHFAIL: {
+        DEBUG_OUT_START_MSG();
+        DEBUG_OUT("PPP status PPPERR_AUTHFAIL: Failed authentication challenge");
+        DEBUG_OUT_END_MSG();
 //      printf("status_cb: Failed authentication challenge\n");
       break;
     }
     case PPPERR_PROTOCOL: {
+        DEBUG_OUT_START_MSG();
+        DEBUG_OUT("PPP status PPPERR_PROTOCOL: Failed to meet protocol");
+        DEBUG_OUT_END_MSG();
 //      printf("status_cb: Failed to meet protocol\n");
       break;
     }
     case PPPERR_PEERDEAD: {
+        DEBUG_OUT_START_MSG();
+        DEBUG_OUT("PPP status PPPERR_PEERDEAD: Connection timeout");
+        DEBUG_OUT_END_MSG();
 //      printf("status_cb: Connection timeout\n");
       break;
     }
     case PPPERR_IDLETIMEOUT: {
+        DEBUG_OUT_START_MSG();
+        DEBUG_OUT("PPP status PPPERR_IDLETIMEOUT: Idle Timeout");
+        DEBUG_OUT_END_MSG();
 //      printf("status_cb: Idle Timeout\n");
       break;
     }
     case PPPERR_CONNECTTIME: {
+        DEBUG_OUT_START_MSG();
+        DEBUG_OUT("PPP status PPPERR_CONNECTTIME: Max connect time reached");
+        DEBUG_OUT_END_MSG();
 //      printf("status_cb: Max connect time reached\n");
       break;
     }
     case PPPERR_LOOPBACK: {
+        DEBUG_OUT_START_MSG();
+        DEBUG_OUT("PPP status PPPERR_LOOPBACK: Loopback detected");
+        DEBUG_OUT_END_MSG();
 //      printf("status_cb: Loopback detected\n");
       break;
     }
     default: {
+        DEBUG_OUT_START_MSG();
+        DEBUG_OUT("PPP status UNKNOWN: Unknown error ");
+        DEBUG_INT_OUT(err_code);
+        DEBUG_OUT_END_MSG();
 //      printf("status_cb: Unknown error code %d\n", err_code);
       break;
     }
@@ -170,7 +265,14 @@ void pppAppInit() {
 	 * status_cb, PPP status callback, called on PPP status change (up, down, …)
 	 * ctx_cb, optional user-provided callback context pointer
 	 */
-	ppp = pppapi_pppos_create(&ppp_netif,
+    DEBUG_OUT_START_MSG();
+    DEBUG_OUT("call pppos_create");
+    DEBUG_OUT_END_MSG();
+	vTaskDelay(pdMS_TO_TICKS(200));
+
+	memset (&ppp_netif,0,sizeof(ppp_netif));
+
+	ppp = pppos_create(&ppp_netif,
 			PPPUsartSend, status_cb, NULL);
 
 	/*
@@ -189,11 +291,20 @@ void pppAppInit() {
 
 	/* Set our address */
 	IP4_ADDR(&addr, 192,168,203,2);
+    DEBUG_OUT_START_MSG();
+    DEBUG_OUT("ppp_set_ipcp_ouraddr");
+    DEBUG_OUT_END_MSG();
+	vTaskDelay(pdMS_TO_TICKS(200));
 	ppp_set_ipcp_ouraddr(ppp, &addr);
 
 	/* Set peer(his) address */
 	IP4_ADDR(&addr, 192,168,203,1);
+    DEBUG_OUT_START_MSG();
+    DEBUG_OUT("ppp_set_ipcp_hisaddr");
+    DEBUG_OUT_END_MSG();
+	vTaskDelay(pdMS_TO_TICKS(200));
 	ppp_set_ipcp_hisaddr(ppp, &addr);
+	/**/
 
 	/* Set primary DNS server */
 	//IP4_ADDR(&addr, 192,168,10,20);
@@ -203,18 +314,37 @@ void pppAppInit() {
 	//IP4_ADDR(&addr, 192,168,10,21);
 	//ppp_set_ipcp_dnsaddr(ppp, 1, &addr);
 
-	/* Auth configuration, this is pretty self-explanatory */
+	/* Auth configuration, this is pretty self-explanatory * /
+    DEBUG_OUT_START_MSG();
+    DEBUG_OUT("ppp_set_auth");
+    DEBUG_OUT_END_MSG();
 	ppp_set_auth(ppp, PPPAUTHTYPE_ANY, "login", "password");
 
-	/* Require peer to authenticate */
+	/ * Require peer to authenticate * /
+    DEBUG_OUT_START_MSG();
+    DEBUG_OUT("ppp_set_auth_required");
+    DEBUG_OUT_END_MSG();
 	ppp_set_auth_required(ppp, 1);
+	*/
 
-	pppapi_set_notify_phase_callback(ppp, ppp_notify_phase_cb);
+    DEBUG_OUT_START_MSG();
+    DEBUG_OUT("ppp_set_notify_phase_callback");
+    DEBUG_OUT_END_MSG();
+	vTaskDelay(pdMS_TO_TICKS(200));
+	ppp_set_notify_phase_callback(ppp, ppp_notify_phase_cb);
 
 	// Setup the serial port.
+    DEBUG_OUT_START_MSG();
+    DEBUG_OUT("PPPUsartInit");
+    DEBUG_OUT_END_MSG();
+	vTaskDelay(pdMS_TO_TICKS(200));
 	PPPUsartInit();
 
 	// ... and startup the receiver
+    DEBUG_OUT_START_MSG();
+    DEBUG_OUT("PPPUsartStart");
+    DEBUG_OUT_END_MSG();
+	vTaskDelay(pdMS_TO_TICKS(200));
 	PPPUsartStart(ppp);
 
 	/*
@@ -226,14 +356,22 @@ void pppAppInit() {
 	 * session before initiating PPP itself. We need this call because there is
 	 * two passive modes for PPPoS, ppp_set_passive and ppp_set_silent.
 	 */
+    DEBUG_OUT_START_MSG();
+    DEBUG_OUT("ppp_set_passive");
+    DEBUG_OUT_END_MSG();
+	vTaskDelay(pdMS_TO_TICKS(200));
 	ppp_set_passive(ppp, 1);
+
+	ppp_set_default(ppp);
 
 	/*
 	 * Initiate PPP listener (i.e. wait for an incoming connection), can only
 	 * be called if PPP session is in the dead state (i.e. disconnected).
 	 */
-	pppapi_listen(ppp);
-
-
+    DEBUG_OUT_START_MSG();
+    DEBUG_OUT("ppp_listen");
+    DEBUG_OUT_END_MSG();
+	vTaskDelay(pdMS_TO_TICKS(200));
+	ppp_listen(ppp);
 }
 
