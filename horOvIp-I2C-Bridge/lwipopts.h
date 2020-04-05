@@ -81,7 +81,7 @@
 #define PPP_SUPPORT						1
 #define LWIP_PPP_API					1
 #define PPP_USE_PBUF_RAM                1
-//#define PAP_SUPPORT                     0
+#define PAP_SUPPORT                     0
 #define CHAP_SUPPORT                    0
 #define MSCHAP_SUPPORT                  0
 #define EAP_SUPPORT                     0
@@ -90,10 +90,17 @@
 #define PPP_NOTIFY_PHASE                1
 #define PPP_MRU                         296
 #define PPP_DEFMRU                      296
+#define PPP_MAXMRU                      296
+
+// Limit user and password length for PAP authentication
+// This is not a top-secure application :)
+#define MAXNAMELEN                      32
+#define MAXSECRETLEN                    32
+
 
 #define VJ_SUPPORT                      0
-// #define CCP_SUPPORT						1
-// #define DEFLATE_SUPPORT					1
+#define CCP_SUPPORT						0
+#define DEFLATE_SUPPORT					0
 
 // Work-around of socket ioctl macros which cannot be determined by avr-gcc
 // I let the macros in sockets.h be calculated by a X64_86 gcc, and fill in the constants directly here.

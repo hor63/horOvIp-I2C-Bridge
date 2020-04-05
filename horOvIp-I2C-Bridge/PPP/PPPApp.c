@@ -314,18 +314,18 @@ void pppAppInit() {
 	//IP4_ADDR(&addr, 192,168,10,21);
 	//ppp_set_ipcp_dnsaddr(ppp, 1, &addr);
 
-	/* Auth configuration, this is pretty self-explanatory * /
+	/* Auth configuration, this is pretty self-explanatory +/
     DEBUG_OUT_START_MSG();
     DEBUG_OUT("ppp_set_auth");
     DEBUG_OUT_END_MSG();
-	ppp_set_auth(ppp, PPPAUTHTYPE_ANY, "login", "password");
+	ppp_set_auth(ppp, PPPAUTHTYPE_ANY, "horOVSensBox", "openSecret");
 
-	/ * Require peer to authenticate * /
+	/+ Require peer to authenticate +/
     DEBUG_OUT_START_MSG();
     DEBUG_OUT("ppp_set_auth_required");
     DEBUG_OUT_END_MSG();
 	ppp_set_auth_required(ppp, 1);
-	*/
+	/+ */
 
     DEBUG_OUT_START_MSG();
     DEBUG_OUT("ppp_set_notify_phase_callback");
