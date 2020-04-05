@@ -29,9 +29,9 @@
 
 
 /** \brief Character buffer for integer to string conversion
- * 9 digits + sign are enough for 32-bit ints
+ * 10 digits + sign are enough for 32-bit ints
  */
-static char convertBuf[10];
+static char convertBuf[14];
 
 static uint8_t outBuf[256];
 static uint8_t currOutIndex = 0;
@@ -183,6 +183,19 @@ void debugOutUIntHex(unsigned int val) {
 	debugOutStr(utoa(val,convertBuf,16));
 	portEXIT_CRITICAL();
 }
+
+void debugOutULong(unsigned long val) {
+	portENTER_CRITICAL();
+	debugOutStr(ultoa(val,convertBuf,10));
+	portEXIT_CRITICAL();
+}
+
+void debugOutULongHex(unsigned long val) {
+	portENTER_CRITICAL();
+	debugOutStr(ultoa(val,convertBuf,16));
+	portEXIT_CRITICAL();
+}
+
 
 // The send buffer is ready to take another byte to be sent
 ISR(USART1_UDRE_vect) {

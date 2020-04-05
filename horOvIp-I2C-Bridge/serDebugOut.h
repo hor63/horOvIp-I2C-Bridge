@@ -20,6 +20,8 @@
 	#define DEBUG_INT_OUT(x) debugOutInt(x)
 	#define DEBUG_UINT_OUT(x) debugOutUInt(x)
 	#define DEBUG_UINT_HEX_OUT(x) debugOutUIntHex(x)
+	#define DEBUG_ULONG_OUT(x) debugOutULong(x)
+	#define DEBUG_ULONG_HEX_OUT(x) debugOutULongHex(x)
 	#define DEBUG_BYTE_HEX_OUT(x) debugOutByteHex(x)
 	#define DEBUG_CHR_OUT(x) debugOutChr(x)
 #else /* if DEBUG_PRINT */
@@ -72,6 +74,14 @@ void debugOutUInt(unsigned int val);
 /// Print an unsigned int value as hex value out of USART1
 /// The function is not reentrant safe! Never call it from an interrupt handler!!!
 void debugOutUIntHex(unsigned int val);
+
+/// Print an unsigned long value out of USART1
+/// The function is not reentrant safe! Never call it from an interrupt handler!!!
+void debugOutULong(unsigned long val);
+
+/// Print an unsigned long value as hex value out of USART1
+/// The function is not reentrant safe! Never call it from an interrupt handler!!!
+void debugOutULongHex(unsigned long val);
 
 /// Print an unsigned character value as hex value out of USART1
 /// The function is not reentrant safe! Never call it from an interrupt handler!!!
