@@ -112,6 +112,20 @@ static void initTask( void *pvParameters ) {
 
 	xSemaphoreTake(tcpStartSem,pdMS_TO_TICKS(10000));
 
+	vSemaphoreDelete(tcpStartSem);
+
+	// Setup timer 3 as a simple overflow timer
+	// Output Pins OCN3A and OCN3B are disconnected.
+	// Operation mode "Normal", i.e. Counter running up until overflow.
+	TCCR3A = 0U;
+	// Input noise canceler off,
+	// Operation mode is Normal
+	// CLock select is system clock without prescaler.
+	TCCR3B = _BV(CS30);
+
+	// Enable timer 3 interrupt overflow.
+	TIMSK3 = _BV(TOIE3);
+
 	DEBUG_OUT_START_MSG();
 	DEBUG_OUT("STARTUP done");
 	DEBUG_OUT_END_MSG();
@@ -132,6 +146,24 @@ static void vTestTimerFunction( TimerHandle_t xTimer ) {
 }
 
 static HeapStats_t heapStats;
+// Used to count the system clocks with timer 3
+// To form a 32-bit counter.
+static uint16_t numTimer3Overruns = 0;
+
+static uint32_t clocksBeforeSleep = 0;
+static uint32_t clocksInSleep = 0;
+
+static uint32_t getSysClocks() {
+	uint32_t ret;
+
+	portENTER_CRITICAL();
+
+	ret = ((uint32_t)numTimer3Overruns << 16) + TCNT3;
+
+	portEXIT_CRITICAL();
+
+	return ret;
+}
 
 static void vStatisticsTimerFunction( TimerHandle_t xTimer ) {
 
@@ -152,14 +184,26 @@ static void vStatisticsTimerFunction( TimerHandle_t xTimer ) {
 	DEBUG_UINT_OUT(heapStats.xNumberOfSuccessfulFrees);
 	DEBUG_OUT("\r\nMinEverSpace = ");
 	DEBUG_UINT_OUT(heapStats.xMinimumEverFreeBytesRemaining);
+	DEBUG_OUT("\r\nClocks = ");
+	DEBUG_ULONG_OUT(getSysClocks());
+	DEBUG_OUT("\r\nClocks in sleep = ");
+	DEBUG_ULONG_OUT(clocksInSleep);
 	DEBUG_OUT("\r\n\r\n");
 
 }
 
 void vApplicationIdleHook( void ) {
 
+	uint32_t currSysClocks;
+
+
+	clocksBeforeSleep = getSysClocks();
+
 	sleep_cpu();
 
+	currSysClocks = getSysClocks();
+
+	clocksInSleep += (currSysClocks - clocksBeforeSleep);
 }
 
 
@@ -285,4 +329,8 @@ void ip_i2c_bridge_appcall() {
 		mainLoopMustRun = true;
 	}
 	*/
+}
+
+ISR(TIMER3_OVF_vect) {
+	numTimer3Overruns ++;
 }
