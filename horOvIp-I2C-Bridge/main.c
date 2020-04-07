@@ -71,12 +71,12 @@ int main(void) {
 }
 
 void tcpipInitDoneCb (void* d) {
-	SemaphoreHandle_t sem = (SemaphoreHandle_t) d;
+	TaskHandle_t mainTask = (TaskHandle_t) d;
 
 	// Initialize PPP and startup the PPP listener.
 	pppAppInit();
 
-	xSemaphoreGive(sem);
+	xTaskNotifyGive(mainTask);
 
 }
 
@@ -87,8 +87,6 @@ static void initTask( void *pvParameters ) {
 	DEBUG_OUT_START_MSG();
 	DEBUG_OUT("horOV IMU board V0.2");
 	DEBUG_OUT_END_MSG();
-
-	SemaphoreHandle_t tcpStartSem = xSemaphoreCreateBinary();
 
 	// Let other components start up safely, particularly the IMU but also other sensors
 	vTaskDelay(pdMS_TO_TICKS(1000));
@@ -106,13 +104,9 @@ static void initTask( void *pvParameters ) {
 
 	vTaskDelay(pdMS_TO_TICKS(200));
 
+	tcpip_init(tcpipInitDoneCb, xTaskGetCurrentTaskHandle());
 
-	tcpip_init(tcpipInitDoneCb, tcpStartSem);
-
-
-	xSemaphoreTake(tcpStartSem,pdMS_TO_TICKS(10000));
-
-	vSemaphoreDelete(tcpStartSem);
+	ulTaskNotifyTake(pdTRUE,10000);
 
 	// Setup timer 3 as a simple overflow timer
 	// Output Pins OCN3A and OCN3B are disconnected.
