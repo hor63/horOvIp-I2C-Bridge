@@ -10,9 +10,10 @@
 #include <setjmp.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
-#include <avr/sleep.h>
-#include <util/delay.h>
 #include <string.h>
+
+#include "FreeRTOS.h"
+#include "task.h"
 
 #include "BMX160.h"
 #include "serDebugOut.h"
@@ -64,40 +65,15 @@ static uint8_t trim_xyz_data[4] = {0};
 static uint8_t trim_xy1xy2[10] = {0};
 
 
-static bool waitI2CTransfer(const char* transferAction) {
-enum I2CTransferResult rc;
-uint8_t HWStatus;
-enum I2CStatus errSeqStatus;
-	
-	rc = I2CWaitGetTransferResult(
-	&HWStatus,
-	&errSeqStatus);
-
-	if (rc == I2C_RC_OK) {
-		return true;
-	} else {
-		DEBUG_OUT(transferAction);
-		DEBUG_OUT (" not OK. rc = ");
-		DEBUG_UINT_OUT(rc);
-		DEBUG_OUT (", HW status = ");
-		DEBUG_UINT_OUT(HWStatus);
-		DEBUG_OUT (", Status diagram position = ");
-		DEBUG_UINT_OUT(errSeqStatus);
-		DEBUG_CHR_OUT('\n');
-		return false;
-	}
-
-}
-
 static void wait_mag_man_op_finished() {
 
+	enum I2CTransferResult ret;
 	// Wait for the mag_man_op flag to clear
 	do {
 		dataBuf[0] = BMX160_STATUS_REG;
 		dataBuf[1] = 0;
-		I2CStartTransferSendReceive(BMX160ADDR,dataBuf,1,dataBuf+1,1,NULL);
-		waitI2CTransfer("Read status reg");
-	} while (dataBuf[1] & (1 << BMX160_STATUS_MAG_MAN_OP));
+		ret = I2CTransferSendReceive(BMX160ADDR,dataBuf,1,dataBuf+1,1,NULL,NULL);
+	} while (ret != I2C_RC_OK || (dataBuf[1] & (1 << BMX160_STATUS_MAG_MAN_OP)));
 	
 }
 
@@ -125,23 +101,20 @@ static void readMagRegisters(uint8_t *buf,uint8_t reg,uint8_t len) {
 	// Set the burst read len
 	dataBuf[0] = BMX160_MAG_IF_CONF_REG;
 	dataBuf[1] = (1<<BMX160_MAG_IF_MAG_MAN_EN_BIT) | ((lenCode & BMX160_MAG_IF_MAG_READ_BURST_LEN_MASK) << BMX160_MAG_IF_MAG_READ_BURST_LEN_LWB);
-	I2CStartTransferSend(BMX160ADDR,dataBuf,2,NULL);
-	waitI2CTransfer("Set MAG read burst len");
-	_delay_us(10);
+	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
+	vTaskDelay(pdMS_TO_TICKS(10));
 
 	dataBuf[0] = BMX160_MAG_IF_READ_ADDR_REG;
 	dataBuf[1] = reg;
-	I2CStartTransferSend(BMX160ADDR,dataBuf,2,NULL);
-	waitI2CTransfer("Set MAG read addr reg");
-	_delay_us(10);
+	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
+	vTaskDelay(pdMS_TO_TICKS(10));
 
 	// Wait for the transfer to finish
 	wait_mag_man_op_finished();
 
 	// Now the data reside in the MAG registers of the BMX160
 	dataBuf[0] = BMX160_DATA_REG + BMX160_DATA_MAG_X_LSB_OFFS;
-	I2CStartTransferSendReceive(BMX160ADDR,dataBuf,1,buf,len,NULL);
-	waitI2CTransfer("Read Mag registers");
+	I2CTransferSendReceive(BMX160ADDR,dataBuf,1,buf,len,NULL,NULL);
 	
 }
 
@@ -151,24 +124,22 @@ static void resetSensor() {
 	do {
 		dataBuf[0] = BMX160_CMD_REG;
 		dataBuf[1] = BMX160_CMD_SOFT_RESET;
-		I2CStartTransferSend(BMX160ADDR,dataBuf,2,NULL);
-		waitI2CTransfer("Soft reset BMX160");
-		_delay_ms(BMX160_CMD_RESET_WAIT_TIME);
+		I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
+		vTaskDelay(pdMS_TO_TICKS(BMX160_CMD_RESET_WAIT_TIME));
 
 		// read out the error register
 		dataBuf[0] = BMX160_ERR_REG;
-		I2CStartTransferSendReceive (
+		I2CTransferSendReceive (
 		BMX160ADDR,
 		dataBuf,2,
 		dataBuf,1,
-		NULL);
-		waitI2CTransfer("Read Error register");
+		NULL,NULL);
 	} while (dataBuf[0] & BMX160_ERR_DROP_CMD_ERR_BIT);
 
 	DEBUG_OUT ("Soft reset");
 	DEBUG_OUT (". Last error code = ");
 	DEBUG_UINT_HEX_OUT(dataBuf[0]);
-	DEBUG_CHR_OUT('\n');
+	DEBUG_OUT("\r\n");
 
 }
 
@@ -178,71 +149,65 @@ static void powerAllSensorsOn() {
 	do {
 		dataBuf[0] = BMX160_CMD_REG;
 		dataBuf[1] = BMX160_CMD_SET_ACC_PMU_MODE(BMX160_PMU_STATUS_ACC_NORMAL);
-		I2CStartTransferSend(BMX160ADDR,dataBuf,2,NULL);
-		waitI2CTransfer("Set Accel PMU Mode normal");
-		_delay_ms(BMX160_CMD_SET_ACC_PMU_MODE_WAIT_TIME);
+		I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
+		vTaskDelay(pdMS_TO_TICKS(BMX160_CMD_SET_ACC_PMU_MODE_WAIT_TIME));
 
 		// read out the error register
 		dataBuf[0] = BMX160_ERR_REG;
-		I2CStartTransferSendReceive (
+		I2CTransferSendReceive (
 		BMX160ADDR,
 		dataBuf,2,
 		dataBuf,1,
-		NULL);
-		waitI2CTransfer("Read Error register");
+		NULL,NULL);
 	} while (dataBuf[0] & BMX160_ERR_DROP_CMD_ERR_BIT);
 
 	DEBUG_OUT ("Accel");
 	DEBUG_OUT (" up. Last error code = ");
 	DEBUG_UINT_HEX_OUT(dataBuf[0]);
-	DEBUG_CHR_OUT('\n');
+	DEBUG_OUT("\r\n");
 	
 	// Switch on the gyro
 	do {
 		dataBuf[0] = BMX160_CMD_REG;
 		dataBuf[1] = BMX160_CMD_SET_GYR_PMU_MODE(BMX160_PMU_STATUS_GYR_NORMAL);
-		I2CStartTransferSend(BMX160ADDR,dataBuf,2,NULL);
-		waitI2CTransfer("Set Gyro PMU Mode normal");
-		_delay_ms(BMX160_CMD_SET_GYR_PMU_MODE_WAIT_TIME);
+		I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
+		vTaskDelay(pdMS_TO_TICKS(BMX160_CMD_SET_GYR_PMU_MODE_WAIT_TIME));
 
 		// read out the error register
 		dataBuf[0] = BMX160_ERR_REG;
-		I2CStartTransferSendReceive (
+		I2CTransferSendReceive (
 		BMX160ADDR,
 		dataBuf,1,
 		dataBuf,1,
-		NULL);
-		waitI2CTransfer("Read Error register");
+		NULL,NULL);
 	} while (dataBuf[0] & BMX160_ERR_DROP_CMD_ERR_BIT);
 	
 	DEBUG_OUT ("Gyro");
 	DEBUG_OUT (" up. Last error code = ");
 	DEBUG_UINT_HEX_OUT(dataBuf[0]);
-	DEBUG_CHR_OUT('\n');
+	DEBUG_OUT("\r\n");
 	
 	// Sequence see BMX160 datasheet V1.2, section 2.4.3.1.3, pg. 25
 	// Switch on the magnetometer interface
 	do {
 		dataBuf[0] = BMX160_CMD_REG;
 		dataBuf[1] = BMX160_CMD_SET_MAG_PMU_MODE(BMX160_PMU_STATUS_MAG_IF_NORMAL);
-		I2CStartTransferSend(BMX160ADDR,dataBuf,2,NULL);
-		waitI2CTransfer("Set Mag PMU Mode normal");
-		_delay_ms(BMX160_CMD_SET_MAG_IF_PMU_MODE_WAIT_TIME);
+		I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
+		vTaskDelay(pdMS_TO_TICKS(BMX160_CMD_SET_MAG_IF_PMU_MODE_WAIT_TIME));
 
 		// read out the error register
 		dataBuf[0] = BMX160_ERR_REG;
-		I2CStartTransferSendReceive (
+		I2CTransferSendReceive (
 		BMX160ADDR,
 		dataBuf,1,
 		dataBuf,1,
-		NULL);
-		waitI2CTransfer("Read Error register");
+		NULL,NULL);
 	} while (dataBuf[0] & BMX160_ERR_DROP_CMD_ERR_BIT);
 
 	DEBUG_OUT ("Mag interface");
 	DEBUG_OUT (" up. Last error code = ");
 	DEBUG_UINT_HEX_OUT(dataBuf[0]);
-	DEBUG_CHR_OUT('\n');
+	DEBUG_OUT("\r\n");
 		
 
 }
@@ -255,15 +220,13 @@ static void configAccel() {
 	| (BMX160_ACC_BWP_NORMAL << BMX160_ACC_BWP_LWB)
 	// No undersampling | (BMX160_ACC_US_ENABLE << BMX160_ACC_US_BIT)
 	;
-	I2CStartTransferSend(BMX160ADDR,dataBuf,2,NULL);
-	waitI2CTransfer("Set Accel configuration");
-	_delay_ms(10);
+	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
+	vTaskDelay(pdMS_TO_TICKS(10));
 
 	dataBuf[0] = BMX160_ACC_RANGE_REG;
 	dataBuf[1] = BMX160_ACC_RANGE_4G;
-	I2CStartTransferSend(BMX160ADDR,dataBuf,2,NULL);
-	waitI2CTransfer("Set Accel rate");
-	_delay_ms(10);
+	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
+	vTaskDelay(pdMS_TO_TICKS(10));
 
 }
 
@@ -274,15 +237,13 @@ static void configGyro() {
 	| (BMX160_GYR_ODR << BMX160_GYR_ODR_LWB)
 	| (BMX160_GYR_BWP_NORMAL << BMX160_GYR_BWP_LWB)
 	;
-	I2CStartTransferSend(BMX160ADDR,dataBuf,2,NULL);
-	waitI2CTransfer("Set gyro configuration");
-	_delay_ms(10);
+	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
+	vTaskDelay(pdMS_TO_TICKS(10));
 
 	dataBuf[0] = BMX160_GYR_RANGE_REG;
 	dataBuf[1] = BMX160_GYR_RANGE_250_D_S;
-	I2CStartTransferSend(BMX160ADDR,dataBuf,2,NULL);
-	waitI2CTransfer("Set gyro rate");
-	_delay_ms(10);
+	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
+	vTaskDelay(pdMS_TO_TICKS(10));
 
 }
 
@@ -294,101 +255,87 @@ static void configMag () {
 		| (1<<BMX160_MAG_IF_MAG_MAN_EN_BIT)
 		// | ((readOffset&BMX160_MAG_IF_MAG_TRIG_READ_OFFS_MASK) << BMX160_MAG_IF_MAG_TRIG_READ_OFFS_LWB)
 		;
-	I2CStartTransferSend(BMX160ADDR,dataBuf,2,NULL);
-	waitI2CTransfer("Set Mag_IF to manual mode");
-	_delay_us(10);
+	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
+	vTaskDelay(pdMS_TO_TICKS(10));
 
 	// Mag mode 
 	dataBuf[0] = BMX160_MAG_IF_WRITE_DATA_REG;
 	dataBuf[1] = 0x01;
-	I2CStartTransferSend(BMX160ADDR,dataBuf,2,NULL);
-	waitI2CTransfer("Set Mag_IF Magic");
-	_delay_us(10);
+	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
+	vTaskDelay(pdMS_TO_TICKS(10));
 
 	// ... to sleep mode
 	dataBuf[0] = BMX160_MAG_IF_WRITE_ADDR_REG;
 	dataBuf[1] = 0x4b;
-	I2CStartTransferSend(BMX160ADDR,dataBuf,2,NULL);
-	waitI2CTransfer("Set Mag_IF Magic");
-	_delay_us(10);
+	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
+	vTaskDelay(pdMS_TO_TICKS(10));
 	wait_mag_man_op_finished();
-	_delay_ms(100);
+	vTaskDelay(pdMS_TO_TICKS(10));
 
 	// Mag REPXY preset 
 	dataBuf[0] = BMX160_MAG_IF_WRITE_DATA_REG;
 	dataBuf[1] = 0x04;
-	I2CStartTransferSend(BMX160ADDR,dataBuf,2,NULL);
-	waitI2CTransfer("Set Mag_IF Magic");
-	_delay_us(10);
+	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
+	vTaskDelay(pdMS_TO_TICKS(10));
 	
 	// ... to normal
 	dataBuf[0] = BMX160_MAG_IF_WRITE_ADDR_REG;
 	dataBuf[1] = 0x51;
-	I2CStartTransferSend(BMX160ADDR,dataBuf,2,NULL);
-	waitI2CTransfer("Set Mag_IF Magic");
-	_delay_us(10);
+	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
+	vTaskDelay(pdMS_TO_TICKS(10));
 	wait_mag_man_op_finished();
 	
 	// Mag REPZ preset
 	dataBuf[0] = BMX160_MAG_IF_WRITE_DATA_REG;
 	dataBuf[1] = 0x0e;
-	I2CStartTransferSend(BMX160ADDR,dataBuf,2,NULL);
-	waitI2CTransfer("Set Mag_IF Magic");
-	_delay_us(10);
+	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
+	vTaskDelay(pdMS_TO_TICKS(10));
 	
 	// ... to normal
 	dataBuf[0] = BMX160_MAG_IF_WRITE_ADDR_REG;
 	dataBuf[1] = 0x52;
-	I2CStartTransferSend(BMX160ADDR,dataBuf,2,NULL);
-	waitI2CTransfer("Set Mag_IF Magic");
-	_delay_us(10);
+	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
+	vTaskDelay(pdMS_TO_TICKS(10));
 	wait_mag_man_op_finished();
 	
-	// prepare mag_if for data mode 1
+	// prepare mag_if for data mode part 1
 	dataBuf[0] = BMX160_MAG_IF_WRITE_DATA_REG;
 	dataBuf[1] = 0x02;
-	I2CStartTransferSend(BMX160ADDR,dataBuf,2,NULL);
-	waitI2CTransfer("Set Mag_IF Magic");
-	_delay_us(10);
+	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
+	vTaskDelay(pdMS_TO_TICKS(10));
 	
-	// prepare mag_if for data mode 2
+	// prepare mag_if for data mode part 2
 	dataBuf[0] = BMX160_MAG_IF_WRITE_ADDR_REG;
 	dataBuf[1] = 0x4c;
-	I2CStartTransferSend(BMX160ADDR,dataBuf,2,NULL);
-	waitI2CTransfer("Set Mag_IF Magic");
-	_delay_us(10);
+	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
+	vTaskDelay(pdMS_TO_TICKS(10));
 	wait_mag_man_op_finished();
 	
-	// prepare mag_if for data mode 3
+	// prepare mag_if for data mode part 3
 	dataBuf[0] = BMX160_MAG_IF_READ_ADDR_REG;
 	dataBuf[1] = 0x42;
-	I2CStartTransferSend(BMX160ADDR,dataBuf,2,NULL);
-	waitI2CTransfer("Set Mag_IF Magic");
-	_delay_us(10);
+	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
+	vTaskDelay(pdMS_TO_TICKS(10));
 	wait_mag_man_op_finished();
 
     // Data rate to 50 Hz	
 	dataBuf[0] = BMX160_MAG_IF_ODR_REG;
 	dataBuf[1] = BMX160_MAG_IF_ODR;
-	I2CStartTransferSend(BMX160ADDR,dataBuf,2,NULL);
-	waitI2CTransfer("Set Mag_IF data rate");
-	_delay_us(10);
+	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
+	vTaskDelay(pdMS_TO_TICKS(10));
 	
 	// Set the mag_if to data mode
 	dataBuf[0] = BMX160_MAG_IF_CONF_REG;
 	dataBuf[1] = 0;
-	I2CStartTransferSend(BMX160ADDR,dataBuf,2,NULL);
-	waitI2CTransfer("Set Mag_IF to data mode");
-	_delay_us(10);
+	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
+	vTaskDelay(pdMS_TO_TICKS(10));
 	
 
 	// Set mag_if to low-power mode
 	dataBuf[0] = BMX160_CMD_REG;
 	dataBuf[1] = BMX160_CMD_SET_MAG_PMU_MODE(BMX160_PMU_STATUS_MAG_IF_LOW_PWR);
-	I2CStartTransferSend(BMX160ADDR,dataBuf,2,NULL);
-	waitI2CTransfer("Set MAG_IF to low power");
-	
-	_delay_ms(BMX160_CMD_SET_MAG_IF_PMU_MODE_WAIT_TIME);
+	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
+	vTaskDelay(pdMS_TO_TICKS(BMX160_CMD_SET_MAG_IF_PMU_MODE_WAIT_TIME));
 	
 }
 
@@ -425,151 +372,136 @@ static inline int16_t readMagValueRHall(uint8_t *lowByte) {
 	return rc;
 }
 
-static void readSensorDataWOMagCallb (
-		enum I2CTransferResult transferResult,
-		uint8_t i2cHWStatusCode,
-		enum I2CStatus errSeqStatus) {
+static void readSensorDataWithoutMag() {
+	enum I2CTransferResult transferResult;
+	// Now read the data and the Sensortime registers
+	dataBuf[0] = BMX160_DATA_REG + BMX160_DATA_GYR_X_LSB_OFFS;
+	transferResult = I2CTransferSendReceive(
+			BMX160ADDR,
+			dataBuf,
+			1,
+			dataBuf,
+			BMX160_SENSORTIME_REG + 3 - BMX160_DATA_REG - BMX160_DATA_GYR_X_LSB_OFFS,
+			NULL,NULL);
+	if (transferResult == I2C_RC_OK) {
+		bmx160Data.header.unionCode = BMX160DATA_ACC_GYR;
+		bmx160Data.header.sensorTime0 = dataBuf[BMX160_SENSORTIME_BYTE_0 + BMX160_SENSORTIME_REG - BMX160_DATA_REG - BMX160_DATA_GYR_X_LSB_OFFS];
+		bmx160Data.header.sensorTime1 = dataBuf[BMX160_SENSORTIME_BYTE_1 + BMX160_SENSORTIME_REG - BMX160_DATA_REG - BMX160_DATA_GYR_X_LSB_OFFS];
+		bmx160Data.header.sensorTime2 = dataBuf[BMX160_SENSORTIME_BYTE_2 + BMX160_SENSORTIME_REG - BMX160_DATA_REG - BMX160_DATA_GYR_X_LSB_OFFS];
+		bmx160Data.header.length = sizeof(bmx160Data.header) + sizeof(bmx160Data.accGyrData);
 
-	bmx160Data.header.unionCode = BMX160DATA_ACC_GYR;
-	bmx160Data.header.sensorTime0 = dataBuf[BMX160_SENSORTIME_BYTE_0 + BMX160_SENSORTIME_REG - BMX160_DATA_REG - BMX160_DATA_GYR_X_LSB_OFFS];
-	bmx160Data.header.sensorTime1 = dataBuf[BMX160_SENSORTIME_BYTE_1 + BMX160_SENSORTIME_REG - BMX160_DATA_REG - BMX160_DATA_GYR_X_LSB_OFFS];
-	bmx160Data.header.sensorTime2 = dataBuf[BMX160_SENSORTIME_BYTE_2 + BMX160_SENSORTIME_REG - BMX160_DATA_REG - BMX160_DATA_GYR_X_LSB_OFFS];
-	bmx160Data.header.length = sizeof(bmx160Data.header) + sizeof(bmx160Data.accGyrData);
+		bmx160Data.accGyrData.accX = *((int16_t*)(dataBuf + (BMX160_DATA_ACC_X_LSB_OFFS - BMX160_DATA_GYR_X_LSB_OFFS)));
+		bmx160Data.accGyrData.accY = *((int16_t*)(dataBuf + (BMX160_DATA_ACC_Y_LSB_OFFS - BMX160_DATA_GYR_X_LSB_OFFS)));
+		bmx160Data.accGyrData.accZ = *((int16_t*)(dataBuf + (BMX160_DATA_ACC_Z_LSB_OFFS - BMX160_DATA_GYR_X_LSB_OFFS)));
 
-	bmx160Data.accGyrData.accX = *((int16_t*)(dataBuf + (BMX160_DATA_ACC_X_LSB_OFFS - BMX160_DATA_GYR_X_LSB_OFFS)));
-	bmx160Data.accGyrData.accY = *((int16_t*)(dataBuf + (BMX160_DATA_ACC_Y_LSB_OFFS - BMX160_DATA_GYR_X_LSB_OFFS)));
-	bmx160Data.accGyrData.accZ = *((int16_t*)(dataBuf + (BMX160_DATA_ACC_Z_LSB_OFFS - BMX160_DATA_GYR_X_LSB_OFFS)));
+		bmx160Data.accGyrData.gyrX = *((int16_t*)(dataBuf + (BMX160_DATA_GYR_X_LSB_OFFS - BMX160_DATA_GYR_X_LSB_OFFS)));
+		bmx160Data.accGyrData.gyrY = *((int16_t*)(dataBuf + (BMX160_DATA_GYR_Y_LSB_OFFS - BMX160_DATA_GYR_X_LSB_OFFS)));
+		bmx160Data.accGyrData.gyrZ = *((int16_t*)(dataBuf + (BMX160_DATA_GYR_Z_LSB_OFFS - BMX160_DATA_GYR_X_LSB_OFFS)));
 
-	bmx160Data.accGyrData.gyrX = *((int16_t*)(dataBuf + (BMX160_DATA_GYR_X_LSB_OFFS - BMX160_DATA_GYR_X_LSB_OFFS)));
-	bmx160Data.accGyrData.gyrY = *((int16_t*)(dataBuf + (BMX160_DATA_GYR_Y_LSB_OFFS - BMX160_DATA_GYR_X_LSB_OFFS)));
-	bmx160Data.accGyrData.gyrZ = *((int16_t*)(dataBuf + (BMX160_DATA_GYR_Z_LSB_OFFS - BMX160_DATA_GYR_X_LSB_OFFS)));
+		/* */
+			DEBUG_OUT("Sensor data no Mag, len = ");
+			DEBUG_UINT_OUT(bmx160Data.header.length);
+			DEBUG_OUT(", AccX = ");
+			DEBUG_INT_OUT(bmx160Data.accGyrData.accX);
+			DEBUG_OUT(", GyrX = ");
+			DEBUG_INT_OUT(bmx160Data.accGyrData.gyrX);
+			DEBUG_OUT("\r\n");
+		/* */
 
-	dataValid = true;
-	transferRunning = false;
+		dataValid = true;
+		transferRunning = false;
+	}
+}
 
-/*
-	DEBUG_OUT("Sensor data no Mag, len = ");
-	DEBUG_UINT_OUT(bmx160Data.header.length);
-	DEBUG_OUT(", AccX = ");
-	DEBUG_INT_OUT(bmx160Data.accGyrData.accX);
-	DEBUG_OUT(", GyrX = ");
-	DEBUG_INT_OUT(bmx160Data.accGyrData.gyrX);
-	DEBUG_CHR_OUT('\n');
-*/
+static void readSensorDataWithMag() {
+	enum I2CTransferResult transferResult;
+
+	// Now read the data and the Sensortime registers
+	dataBuf[0] = BMX160_DATA_REG;
+	transferResult = I2CTransferSendReceive(
+			BMX160ADDR,dataBuf,
+			1,
+			dataBuf,
+			BMX160_SENSORTIME_REG + 3 - BMX160_DATA_REG,
+			NULL,NULL);
+	if (transferResult == I2C_RC_OK) {
+		bmx160Data.header.unionCode = BMX160DATA_ACC_GYR_MAG;
+		bmx160Data.header.sensorTime0 = dataBuf[BMX160_SENSORTIME_BYTE_0 + BMX160_SENSORTIME_REG - BMX160_DATA_REG];
+		bmx160Data.header.sensorTime1 = dataBuf[BMX160_SENSORTIME_BYTE_1 + BMX160_SENSORTIME_REG - BMX160_DATA_REG];
+		bmx160Data.header.sensorTime2 = dataBuf[BMX160_SENSORTIME_BYTE_2 + BMX160_SENSORTIME_REG - BMX160_DATA_REG];
+		bmx160Data.header.length = sizeof(bmx160Data.header) + sizeof(bmx160Data.accGyrMagData);
+
+		bmx160Data.accGyrMagData.accX = *((int16_t*)(dataBuf + (BMX160_DATA_ACC_X_LSB_OFFS)));
+		bmx160Data.accGyrMagData.accY = *((int16_t*)(dataBuf + (BMX160_DATA_ACC_Y_LSB_OFFS)));
+		bmx160Data.accGyrMagData.accZ = *((int16_t*)(dataBuf + (BMX160_DATA_ACC_Z_LSB_OFFS)));
+
+		bmx160Data.accGyrMagData.gyrX = *((int16_t*)(dataBuf + (BMX160_DATA_GYR_X_LSB_OFFS)));
+		bmx160Data.accGyrMagData.gyrY = *((int16_t*)(dataBuf + (BMX160_DATA_GYR_Y_LSB_OFFS)));
+		bmx160Data.accGyrMagData.gyrZ = *((int16_t*)(dataBuf + (BMX160_DATA_GYR_Z_LSB_OFFS)));
+
+		bmx160Data.accGyrMagData.magX = readMagValueXY(dataBuf + (BMX160_DATA_MAG_X_LSB_OFFS));
+		bmx160Data.accGyrMagData.magY = readMagValueXY(dataBuf + (BMX160_DATA_MAG_Y_LSB_OFFS));
+		bmx160Data.accGyrMagData.magZ = readMagValueZ(dataBuf + (BMX160_DATA_MAG_Z_LSB_OFFS));
+		bmx160Data.accGyrMagData.magRHall = readMagValueRHall(dataBuf + (BMX160_DATA_RHALL_LSB_OFFS));
+
+		dataValid = true;
+		transferRunning = false;
+
+	/* */
+		DEBUG_OUT("Sensor data with Mag, len = ");
+		DEBUG_UINT_OUT(bmx160Data.header.length);
+		DEBUG_OUT(", AccX = ");
+		DEBUG_INT_OUT(bmx160Data.accGyrMagData.accX);
+		DEBUG_OUT(", GyrX = ");
+		DEBUG_INT_OUT(bmx160Data.accGyrMagData.gyrX);
+		DEBUG_OUT(", MagX = ");
+		DEBUG_INT_OUT(bmx160Data.accGyrMagData.magX);
+		DEBUG_OUT("\r\n");
+	/* */
+	}
 
 }
 
-static void readSensorDataWithMagCallb (
-		enum I2CTransferResult transferResult,
-		uint8_t i2cHWStatusCode,
-		enum I2CStatus errSeqStatus) {
-
-	bmx160Data.header.unionCode = BMX160DATA_ACC_GYR_MAG;
-	bmx160Data.header.sensorTime0 = dataBuf[BMX160_SENSORTIME_BYTE_0 + BMX160_SENSORTIME_REG - BMX160_DATA_REG];
-	bmx160Data.header.sensorTime1 = dataBuf[BMX160_SENSORTIME_BYTE_1 + BMX160_SENSORTIME_REG - BMX160_DATA_REG];
-	bmx160Data.header.sensorTime2 = dataBuf[BMX160_SENSORTIME_BYTE_2 + BMX160_SENSORTIME_REG - BMX160_DATA_REG];
-	bmx160Data.header.length = sizeof(bmx160Data.header) + sizeof(bmx160Data.accGyrMagData);
-
-	bmx160Data.accGyrMagData.accX = *((int16_t*)(dataBuf + (BMX160_DATA_ACC_X_LSB_OFFS)));
-	bmx160Data.accGyrMagData.accY = *((int16_t*)(dataBuf + (BMX160_DATA_ACC_Y_LSB_OFFS)));
-	bmx160Data.accGyrMagData.accZ = *((int16_t*)(dataBuf + (BMX160_DATA_ACC_Z_LSB_OFFS)));
-
-	bmx160Data.accGyrMagData.gyrX = *((int16_t*)(dataBuf + (BMX160_DATA_GYR_X_LSB_OFFS)));
-	bmx160Data.accGyrMagData.gyrY = *((int16_t*)(dataBuf + (BMX160_DATA_GYR_Y_LSB_OFFS)));
-	bmx160Data.accGyrMagData.gyrZ = *((int16_t*)(dataBuf + (BMX160_DATA_GYR_Z_LSB_OFFS)));
-
-	bmx160Data.accGyrMagData.magX = readMagValueXY(dataBuf + (BMX160_DATA_MAG_X_LSB_OFFS));
-	bmx160Data.accGyrMagData.magY = readMagValueXY(dataBuf + (BMX160_DATA_MAG_Y_LSB_OFFS));
-	bmx160Data.accGyrMagData.magZ = readMagValueZ(dataBuf + (BMX160_DATA_MAG_Z_LSB_OFFS));
-	bmx160Data.accGyrMagData.magRHall = readMagValueRHall(dataBuf + (BMX160_DATA_RHALL_LSB_OFFS));
-
-	dataValid = true;
-	transferRunning = false;
-
-/*
-	DEBUG_OUT("Sensor data with Mag, len = ");
-	DEBUG_UINT_OUT(bmx160Data.header.length);
-	DEBUG_OUT(", AccX = ");
-	DEBUG_INT_OUT(bmx160Data.accGyrMagData.accX);
-	DEBUG_OUT(", GyrX = ");
-	DEBUG_INT_OUT(bmx160Data.accGyrMagData.gyrX);
-	DEBUG_OUT(", MagX = ");
-	DEBUG_INT_OUT(bmx160Data.accGyrMagData.magX);
-	DEBUG_CHR_OUT('\n');
-*/
-}
-
-static void readStatusRegForSensorData();
-
-static void readStatusRegForSensorDataCallb (
-		enum I2CTransferResult transferResult,
-		uint8_t i2cHWStatusCode,
-		enum I2CStatus errSeqStatus) {
+static void readSensorData() {
 
 	// How often did you read the status before new data were present?
-	static uint16_t numReadStatus = 1;
+	uint16_t numReadStatus = 0;
+	enum I2CTransferResult transferResult;
+
+	// Wait for data become ready. At least Gyro and Accel are always there when data are there at all.
+	do {
+		dataBuf[0] = BMX160_STATUS_REG;
+
+		transferResult = I2CTransferSendReceive(BMX160ADDR,dataBuf,1,dataBuf,1,NULL,NULL);
+		if (transferResult != I2C_RC_OK) {
+			break;
+		}
+		numReadStatus ++;
+	}	while ((dataBuf[0] & (1<<BMX160_STATUS_DRDY_ACC | 1<<BMX160_STATUS_DRDY_GYR)) != (1<<BMX160_STATUS_DRDY_ACC | 1<<BMX160_STATUS_DRDY_GYR));
 
 
 	if (transferResult == I2C_RC_OK) {
 
-		// Check which data are available
-		if ((dataBuf[0] & (1<<BMX160_STATUS_DRDY_ACC | 1<<BMX160_STATUS_DRDY_GYR)) == (1<<BMX160_STATUS_DRDY_ACC | 1<<BMX160_STATUS_DRDY_GYR)) {
-			// At least Gyro and and Accel data are there.
+		// At least Gyro and and Accel data are there.
 
-/*
-			DEBUG_OUT("New data present. Number status reads = ");
-			DEBUG_UINT_OUT(numReadStatus);
-			DEBUG_CHR_OUT('\n');
-*/
-			numReadStatus = 1;
-
-			if (dataBuf[0] & (1<<BMX160_STATUS_DRDY_MAG)) {
-				// Mag data are present too.
-				// Now read the data and the Sensortime registers
-				dataBuf[0] = BMX160_DATA_REG;
-				I2CStartTransferSendReceive(
-						BMX160ADDR,dataBuf,
-						1,
-						dataBuf,
-						BMX160_SENSORTIME_REG + 3 - BMX160_DATA_REG,
-						readSensorDataWithMagCallb);
-			} else {
-				// Read only gyro and accel.
-				// Now read the data and the Sensortime registers
-				dataBuf[0] = BMX160_DATA_REG + BMX160_DATA_GYR_X_LSB_OFFS;
-				I2CStartTransferSendReceive(
-						BMX160ADDR,
-						dataBuf,
-						1,
-						dataBuf,
-						BMX160_SENSORTIME_REG + 3 - BMX160_DATA_REG - BMX160_DATA_GYR_X_LSB_OFFS,
-						readSensorDataWOMagCallb);
-			}
+/* */
+		DEBUG_OUT("New data present. Number status reads = ");
+		DEBUG_UINT_OUT(numReadStatus);
+		DEBUG_OUT("\r\n");
+/* */
+		if (dataBuf[0] & (1<<BMX160_STATUS_DRDY_MAG)) {
+			// Mag data are present too.
+			readSensorDataWithMag();
 		} else {
-			// It is too early. Data are not yet available.
-			// Read the status until data are present
-			readStatusRegForSensorData();
-			numReadStatus ++;
+			// Read only gyro and accel.
+			readSensorDataWithoutMag();
 		}
-
-	} else { // if (transferResult == I2C_RC_OK)
-		// Do it again. Something went wrong
-		readStatusRegForSensorData();
-		numReadStatus ++;
-	} // if (transferResult == I2C_RC_OK)
-
-}
-
-static void readStatusRegForSensorData() {
-
-	dataBuf[0] = BMX160_STATUS_REG;
-	I2CStartTransferSendReceive(BMX160ADDR,dataBuf,1,dataBuf,1,readStatusRegForSensorDataCallb);
-
+	}
 }
 
 /** Start reading sensor data.
  *
- * This call is asynchronous. Processing depends on cyclic calls to \ref I2CPoll()
+ * This call is synchronous.
  * You can poll the success with \ref BMX160IsDataPresent() or directly \ref BMX160GetData()
  */
 static void readoutSensors() {
@@ -579,7 +511,7 @@ static void readoutSensors() {
 		dataValid = false;
 		transferRunning = true;
 		// First read the status until all sensor data are present
-		readStatusRegForSensorData();
+		readSensorData();
 	}
 
 }
@@ -592,21 +524,42 @@ static void readoutSensors() {
  *
  *
  */
-void readTrimRegistersRawValues()
+static void readTrimRegistersRawValues()
 {
 
+	int i;
+
 	/* Trim register value is read */
-	readMagRegisters(trim_x1y1,BMM150_DIG_X1_REG,2);
-	readMagRegisters(trim_xyz_data,BMM150_DIG_Z4_LSB_REG,4);
+
 	// The original read 10 bytes.
-	// Since the indirect burst read only supports 8 bytes I read 8 and 2 bytes.
+	// Since the indirect burst read supports maximal 8 bytes I read 8 and 2 bytes.
 	readMagRegisters(trim_xy1xy2,BMM150_DIG_Z2_LSB_REG,8);
 	readMagRegisters(trim_xy1xy2+8,BMM150_DIG_Z2_LSB_REG+8,2);
-}
+
+	readMagRegisters(trim_x1y1,BMM150_DIG_X1_REG,2);
+	// Indirect burst read does support 2, and then next 6 but not 4.
+	// Therefore split it up into 2 2-byte bursts.
+	readMagRegisters(trim_xyz_data,BMM150_DIG_Z4_LSB_REG,2);
+	readMagRegisters(trim_xyz_data+2,BMM150_DIG_Z4_LSB_REG+2,2);
 
 
-static void timerTickOccurred (uint8_t numTicks){
-	readoutSensors();
+	DEBUG_OUT("Read trim registers\r\n");
+	DEBUG_OUT("trim_x1y1 = ");
+	for (i=0; i<2; i++) {
+		DEBUG_UINT_OUT(trim_x1y1[1]);
+		DEBUG_OUT(", ");
+	}
+	DEBUG_OUT("\r\ntrim_xyz = ");
+	for (i=0; i<4; i++) {
+		DEBUG_UINT_OUT(trim_xyz_data[i]);
+		DEBUG_OUT(", ");
+	}
+	DEBUG_OUT("\r\ntrim_xy1xy2 = ");
+	for (i=0; i<10; i++) {
+		DEBUG_UINT_OUT(trim_xy1xy2[i]);
+		DEBUG_OUT(", ");
+	}
+	DEBUG_OUT("\r\n");
 }
 
 
@@ -617,12 +570,17 @@ void BMX160Init() {
 
 	powerAllSensorsOn();
 
+	// Let the mag sensor get into the swing
+	vTaskDelay(pdMS_TO_TICKS(200));
+
 	readTrimRegistersRawValues();
 
 	configAccel();
 	configGyro();
 	configMag();
 
+	vTaskDelay(pdMS_TO_TICKS(200));
+	readoutSensors();
 }
 
 // Copied with some modification from the Bosch BMM150 driver
@@ -686,3 +644,4 @@ struct BMX160Data* BMX160GetData(){
 	return &bmx160Data;
 	
 }
+

@@ -179,7 +179,7 @@
 // These times are very conservative, and longer than the official max time from the data sheet
 #define BMX160_CMD_SET_ACC_PMU_MODE_WAIT_TIME 5
 #define BMX160_CMD_SET_GYR_PMU_MODE_WAIT_TIME 100
-#define BMX160_CMD_SET_MAG_IF_PMU_MODE_WAIT_TIME 2
+#define BMX160_CMD_SET_MAG_IF_PMU_MODE_WAIT_TIME 5
 
 // Run fast offset calibration
 #define BMX160_CMD_FOC 0x03

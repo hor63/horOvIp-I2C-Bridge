@@ -8,13 +8,16 @@
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
-#include <avr/sleep.h>
+#include <avr/cpufunc.h>
+
 
 #include "config.h"
 #include "serDebugOut.h"
 #include "i2c.h"
 
-#include <util/delay.h>
+#include "FreeRTOS.h"
+#include "task.h"
+#include "semphr.h"
 
 /** I2C clock speed
  * Use the standard I2C speed.
@@ -23,8 +26,6 @@
 
 // Use 15 instead 16 to round the register value
 #define TWI_BIT_RATE_REG_VAL ((F_CPU/I2C_CLOCK_FREQ-15)/2)
-
-static bool I2CTransferFinished = false;
 
 /** 
  * Create the address/R_W byte on the I2C bus.
@@ -113,7 +114,7 @@ static const TActionSequence sequenceReceiveBytesWithRegisterAdress [] = {
 	//STAT_ADDR_W_SENT,
 	{STAT_BYTE_SENT,ACT_SEND_BYTE,STAT_STOP_SENT,ACT_SEND_STOP,0x18},
 	
-	// If only one byte is to be received the action code can twist the next status to STAT_LAST_BYTE_RECEIVED_NACK
+	// If only one byte is to be received the action code can twist the next status to STAT_LAST_BYTE_RECEIVED
 	//STAT_ADDR_R_SENT,
 	{STAT_BYTE_RECEIVED,ACT_RECV_BYTE_ACK,STAT_STOP_SENT,ACT_SEND_STOP,0x40},
 
@@ -154,7 +155,7 @@ static const TActionSequence sequenceReceiveBytes [] = {
 	//STAT_ADDR_W_SENT,
 	{STAT_STOP_SENT,ACT_SEND_STOP,STAT_STOP_SENT,ACT_SEND_STOP,0x00},
 	
-	// If only one byte is to be received the action code can twist the next status to STAT_LAST_BYTE_RECEIVED_NACK
+	// If only one byte is to be received the action code can twist the next status to STAT_LAST_BYTE_RECEIVED
 	//STAT_ADDR_R_SENT,
 	{STAT_BYTE_RECEIVED,ACT_RECV_BYTE_ACK,STAT_STOP_SENT,ACT_SEND_STOP,0x40},
 
@@ -202,8 +203,6 @@ static uint8_t currRecvIndex = 0;
 /// Pointer to the buffer which will accept the received data.
 static uint8_t *recvBuffer    = NULL;
 
-/// Is a transfer active?
-static bool transferActive = false;
 /// The the final result of a transfer. Can be set in between, even if cleanup is being send (i.e. STOP)
 static enum I2CTransferResult transferResult = I2C_RC_UNDEF;
 /// The status code of the I2C hardware when transferResult is not I2C_RC_OK.
@@ -214,26 +213,47 @@ static uint8_t i2cHWStatusCode = 0;
 /// The sequence status when an error occurred.
 static enum I2CStatus errSeqStatus = STAT_IDLE;
 
-/// Callback to the initiator of one of the I2CStartTransfer... calls with the result of the transfer
-static I2CTransferFinishedCallbPtr transferFinishedCallback = NULL;
+static SemaphoreHandle_t i2CMux = 0;
+static TaskHandle_t driverTask = 0;
+static TaskHandle_t callerTask = 0;
+static void i2CDriverTask( void *pvParameters );
 
-void I2CStartTransferSend (
+bool I2CInit() {
+
+	if (!i2CMux) {
+		i2CMux = xSemaphoreCreateMutex();
+	}
+
+	if (!i2CMux) {
+		DEBUG_OUT("I2CInit ERROR: i2CSem is NULL!\r\n");
+		return false;
+	}
+
+	if (!driverTask) {
+		if (xTaskCreate(i2CDriverTask,"I2CDriver",100,NULL,TASK_PRIO_DRIVERS,&driverTask) != pdPASS) {
+			DEBUG_OUT("I2CInit: driverTask creation FAILED!\r\n");
+			return false;
+		}
+	}
+
+	return true;
+}
+
+
+enum I2CTransferResult I2CTransferSend (
 		uint8_t slAddr,
 		uint8_t *data,
 		uint8_t dataLen,
-		I2CTransferFinishedCallbPtr callback) {
+		uint8_t *pHWStatus,
+		enum I2CStatus *pErrSeqStatus) {
 	
-	while (transferActive) {
-		// Force a memory barrier to re-read transferActive
-		__asm__ __volatile__ ("/*nop*/" ::: "memory");
-	}
+	enum I2CTransferResult rc;
 
-	// Cleanly finish any pending previous calls
-	I2CPoll();
+	xSemaphoreTake(i2CMux,portMAX_DELAY);
 
 	currSequence = sequenceSendBytes;
 	currStatusIndex = STAT_START_SENT;
-	currSequenceStatus = &(currSequence[currStatusIndex]);
+	currSequenceStatus = &(currSequence[STAT_START_SENT]);
 	slaveAddr = slAddr;
 	lastSendIndex = dataLen - 1;
 	currSendIndex = 0;
@@ -241,15 +261,13 @@ void I2CStartTransferSend (
 	
 	// Don't worry about receive stuff here.
 	
-	transferActive = true;
 	transferResult = I2C_RC_OK;
 	/// The status code of the I2C hardware when transferResult is not I2C_RC_OK.
 	i2cHWStatusCode = 0;
 	errSeqStatus = STAT_IDLE;
-	transferFinishedCallback = callback;
 
 	// Force a memory barrier to flush all variables to memory
-	__asm__ __volatile__ ("/*nop*/" ::: "memory");
+	portMEMORY_BARRIER();
 	// Activate I2C, activate the interrupt, occupy the bus, and send START
 	TWCR = 0
 	| _BV(TWINT)
@@ -260,22 +278,36 @@ void I2CStartTransferSend (
 	| _BV(TWEN)
 	| _BV(TWIE)
 	;
-	
+
+	// Wait for the transmission to finish
+	callerTask = xTaskGetCurrentTaskHandle();
+	xTaskNotifyStateClear(NULL);
+	ulTaskNotifyTake(pdTRUE,portMAX_DELAY);
+
+	rc = transferResult;
+	if (rc != I2C_RC_OK) {
+		if (pHWStatus) {
+			*pHWStatus = i2cHWStatusCode;
+		}
+		if (pErrSeqStatus) {
+			*pErrSeqStatus	= errSeqStatus;
+		}
+	}
+	xSemaphoreGive(i2CMux);
+
+	return rc;
 }
 
-void I2CStartTransferSendReceive (
-	uint8_t slAddr, 
+enum I2CTransferResult I2CTransferSendReceive (
+	uint8_t slAddr,
 	uint8_t *sendData,uint8_t sendDataLen,
 	uint8_t *recvData,uint8_t recvDataLen,
-	I2CTransferFinishedCallbPtr callback) {
+	uint8_t *pHWStatus,
+	enum I2CStatus *pErrSeqStatus) {
 	
-	while (transferActive) {
-		// Force a memory barrier to re-read transferActive
-		__asm__ __volatile__ ("/*nop*/" ::: "memory");
-	}
+	enum I2CTransferResult rc;
 
-	// Cleanly finish any pending previous calls
-	I2CPoll();
+	xSemaphoreTake(i2CMux,portMAX_DELAY);
 
 	currSequence = sequenceReceiveBytesWithRegisterAdress;
 	currStatusIndex = STAT_START_SENT;
@@ -289,15 +321,13 @@ void I2CStartTransferSendReceive (
 	currRecvIndex = 0;
 	recvBuffer = recvData;
 	
-	transferActive = true;
 	transferResult = I2C_RC_OK;
 	/// The status code of the I2C hardware when transferResult is not I2C_RC_OK.
 	i2cHWStatusCode = 0;
 	errSeqStatus = STAT_IDLE;
-	transferFinishedCallback = callback;
 
 	// Force a memory barrier to flush all variables to memory
-	__asm__ __volatile__ ("/*nop*/" ::: "memory");
+	portMEMORY_BARRIER();
 	// Activate I2C, activate the interrupt, occupy the bus, and send START
 	TWCR = 0
 	| _BV(TWINT)
@@ -308,23 +338,35 @@ void I2CStartTransferSendReceive (
 	| _BV(TWEN)
 	| _BV(TWIE)
 	;
-	
+
+	// Wait for the transmission to finish
+	callerTask = xTaskGetCurrentTaskHandle();
+	xTaskNotifyStateClear(NULL);
+	ulTaskNotifyTake(pdTRUE,portMAX_DELAY);
+
+	rc = transferResult;
+	if (rc != I2C_RC_OK) {
+		if (pHWStatus) {
+			*pHWStatus = i2cHWStatusCode;
+		}
+		if (pErrSeqStatus) {
+			*pErrSeqStatus	= errSeqStatus;
+		}
+	}
+	xSemaphoreGive(i2CMux);
+
+	return rc;
 }
 
-void I2CStartTransferReceive (
-		uint8_t slAddr,
+enum I2CTransferResult I2CTransferReceive (uint8_t slAddr,
 		uint8_t *data,
 		uint8_t dataLen,
-		I2CTransferFinishedCallbPtr callback) {
+		uint8_t *pHWStatus,
+		enum I2CStatus *pErrSeqStatus) {
+	enum I2CTransferResult rc;
+
+	xSemaphoreTake(i2CMux,portMAX_DELAY);
 	
-	while (transferActive) {
-		// Force a memory barrier to re-read transferActive
-		__asm__ __volatile__ ("/*nop*/" ::: "memory");
-	}
-
-	// Cleanly finish any pending previous calls
-	I2CPoll();
-
 	currSequence = sequenceReceiveBytes;
 	currStatusIndex = STAT_START_SENT;
 	currSequenceStatus = &(currSequence[currStatusIndex]);
@@ -333,15 +375,13 @@ void I2CStartTransferReceive (
 	currRecvIndex = 0;
 	recvBuffer = data;
 	
-	transferActive = true;
 	transferResult = I2C_RC_OK;
 	/// The status code of the I2C hardware when transferResult is not I2C_RC_OK.
 	i2cHWStatusCode = 0;
 	errSeqStatus = STAT_IDLE;
-	transferFinishedCallback = callback;
 
 	// Force a memory barrier to flush all variables to memory
-	__asm__ __volatile__ ("/*nop*/" ::: "memory");
+	portMEMORY_BARRIER();
 	// Activate I2C, activate the interrupt, occupy the bus, and send START
 	TWCR = 0
 	| _BV(TWINT)
@@ -352,237 +392,238 @@ void I2CStartTransferReceive (
 	| _BV(TWEN)
 	| _BV(TWIE)
 	;
-	
-}
 
-enum I2CTransferResult I2CWaitGetTransferResult(
-	uint8_t *pHWStatus,
-	enum I2CStatus *pErrSeqStatus) {
+	// Wait for the transmission to finish
+	callerTask = xTaskGetCurrentTaskHandle();
+	xTaskNotifyStateClear(NULL);
+	ulTaskNotifyTake(pdTRUE,portMAX_DELAY);
 
-	cli();
-	while (transferActive) {
-		sleep_enable();
-		sei();
-		sleep_cpu();
-		cli();
-		sleep_disable();
+	rc = transferResult;
+	if (rc != I2C_RC_OK) {
+		if (pHWStatus) {
+			*pHWStatus = i2cHWStatusCode;
+		}
+		if (pErrSeqStatus) {
+			*pErrSeqStatus	= errSeqStatus;
+		}
 	}
-	sei();
-	
-	*pHWStatus = i2cHWStatusCode;
-	*pErrSeqStatus = errSeqStatus;
-	return transferResult;
+	xSemaphoreGive(i2CMux);
+
+	return rc;
 }
 
-bool I2CIsTransferActive() {
-	return transferActive;
-}
-
-
-void I2CPoll() {
-	if (!transferActive && transferFinishedCallback != NULL) {
-		/*
-		 * Evil trap: Previously I called the callback and then set the callback pointer NULL.
-		 * But within the callback I started the next transfer, and set another callback.
-		 * But setting the callback NULL at the end clobbered the defined callback :(
-		 *
-		 * Equally important is to set transferFinishedCallback = NULL before the callback.
-		 * I2CPoll is called by the transfer functions first. This may lead to an endless recursion
-		 * if the callback pointer is still set
-		 */
-		I2CTransferFinishedCallbPtr tmpCallback = transferFinishedCallback;
-		transferFinishedCallback = NULL;
-		tmpCallback (
-				transferResult,
-				i2cHWStatusCode,
-				errSeqStatus
-				);
-	}
-}
-
-
-/// Interrupt handler 
-ISR(TWI_vect){
+static void i2CDriverTask( void *pvParameters ) {
 
 	uint8_t actualHWStatus;
 	uint8_t expectedHWStatus;
 	enum I2CAction action;
 	
-	if (!currSequence || !currSequenceStatus) {
-		// Switch I2C off.
-		TWCR = 0;
-		transferActive = false;
-		currSequence = currSequenceStatus = NULL;
-		return;
-	}
-	
-	// When reading the byte is ready to be picked up.
-	if (currStatusIndex == STAT_LAST_BYTE_RECEIVED || currStatusIndex == STAT_BYTE_RECEIVED) {
-		recvBuffer[currRecvIndex] = TWDR;
-		
-		currRecvIndex++;
-	}
+	for (;;) {
 
-	// Read the HW status register.
-	// Mask out the lower two bits as these are the prescaler.
-	actualHWStatus = TWSR & ~0b11;
+		//// Arghh! A label!
+		loopStart:;
 
-	// Evaluate the expected code and the hardware status code
-	// First unconditional error conditions
-	expectedHWStatus = currSequenceStatus->expectStatusCode;
-	if (expectedHWStatus == 0) {
-		// Expected status 0 means I reached an illegal status. 
-		// This is due to an error of the status diagram definition, i.e. a program error.
-		transferResult = I2C_RC_ILLEGAL_SEQ;
-		errSeqStatus = currStatusIndex;
-		action = currSequenceStatus->nextActionNOK;
-		currStatusIndex = currSequenceStatus->nextStatusNOK;
-	} else { // if (expectedHWStatus == 0)
-		// Expected status 0xff means that the HW status is irrelevant.
-		if ((expectedHWStatus == 0xff) || (expectedHWStatus == actualHWStatus)) {
-			// Either the status does not matter or the expected status was assumed.
-			action = currSequenceStatus->nextActionOK;
-			currStatusIndex = currSequenceStatus->nextStatusOK;
-		} else { // if ((expectedHWStatus == 0xff) || (expectedHWStatus == actualHWStatus))
-			// A different HW status is assumed than the expected one.
-			// Set error flags and codes.
-			// Perform cleanup, i.e. 
-			transferResult = I2C_RC_HW_ERROR;
-			errSeqStatus = currStatusIndex;
-			i2cHWStatusCode = actualHWStatus;
-			action = currSequenceStatus->nextActionNOK;
-			currStatusIndex = currSequenceStatus->nextStatusNOK;
-		} // if ((expectedHWStatus == 0xff) || (expectedHWStatus == actualHWStatus))
-	} // if (expectedHWStatus == 0)
+		// Wait for the interrupt handler
+		ulTaskNotifyTake(pdTRUE,portMAX_DELAY);
 
-	// Here's one irregularity: When I am about to receive the last
-	// Character I must respond the slave with a NAK.
-	if (action == ACT_RECV_BYTE_ACK && currRecvIndex == lastRecvIndex) {
-		action = ACT_RECV_BYTE_NACK;
-		currStatusIndex = STAT_LAST_BYTE_RECEIVED;
-	}
 
-	// And now: Action!
-	switch (action) {
-		case ACT_NONE:
+		if (!currSequence || !currSequenceStatus) {
 			// Switch I2C off.
 			TWCR = 0;
-			transferActive = false;
-			// The status diagram ended.
 			currSequence = currSequenceStatus = NULL;
-			break;
-			
-		case ACT_SEND_START:
-			TWCR = 0
+			// Uh, oh, a goto.
+			// Justified here for simplicity. I cannot return, I *must* continue the loop at the start.
+			goto loopStart;
+		}
+
+		// When reading the byte is ready to be picked up.
+		if (currStatusIndex == STAT_LAST_BYTE_RECEIVED || currStatusIndex == STAT_BYTE_RECEIVED) {
+			recvBuffer[currRecvIndex] = TWDR;
+
+			currRecvIndex++;
+		}
+
+		// Read the HW status register.
+		// Mask out the lower two bits as these are the prescaler.
+		actualHWStatus = TWSR & ~0b11;
+
+		// Evaluate the expected code and the hardware status code
+		// First unconditional error conditions
+		expectedHWStatus = currSequenceStatus->expectStatusCode;
+		if (expectedHWStatus == 0) {
+			// Expected status 0 means I reached an illegal status.
+			// This is due to an error of the status diagram definition, i.e. a program error.
+			transferResult = I2C_RC_ILLEGAL_SEQ;
+			errSeqStatus = currStatusIndex;
+			action = currSequenceStatus->nextActionNOK;
+			currStatusIndex = currSequenceStatus->nextStatusNOK;
+		} else { // if (expectedHWStatus == 0)
+			// Expected status 0xff means that the HW status is irrelevant.
+			if ((expectedHWStatus == 0xff) || (expectedHWStatus == actualHWStatus)) {
+				// Either the status does not matter or the expected status was assumed.
+				action = currSequenceStatus->nextActionOK;
+				currStatusIndex = currSequenceStatus->nextStatusOK;
+			} else { // if ((expectedHWStatus == 0xff) || (expectedHWStatus == actualHWStatus))
+				// A different HW status is assumed than the expected one.
+				// Set error flags and codes.
+				// Perform cleanup, i.e.
+				transferResult = I2C_RC_HW_ERROR;
+				errSeqStatus = currStatusIndex;
+				i2cHWStatusCode = actualHWStatus;
+				action = currSequenceStatus->nextActionNOK;
+				currStatusIndex = currSequenceStatus->nextStatusNOK;
+			} // if ((expectedHWStatus == 0xff) || (expectedHWStatus == actualHWStatus))
+		} // if (expectedHWStatus == 0)
+
+		// Here's one irregularity: When I am about to receive the last
+		// Character I must respond the slave with a NAK.
+		if (action == ACT_RECV_BYTE_ACK && currRecvIndex == lastRecvIndex) {
+			action = ACT_RECV_BYTE_NACK;
+			currStatusIndex = STAT_LAST_BYTE_RECEIVED;
+		}
+
+		/* Proceed to the status for the next round.
+		 * Do it before the action section because during the actions the interrupt is activated
+		 * as well as releasing the application task.
+		 * There are some exceptions below tweaking currStatusIndex,
+		 * thus currSequenceStatus is set again
+		 */
+		currSequenceStatus = &(currSequence[currStatusIndex]);
+
+		// And now: Action!
+		switch (action) {
+			case ACT_NONE:
+				// Switch I2C off.
+				TWCR = 0;
+				// The status diagram ended.
+				currSequence = currSequenceStatus = NULL;
+				break;
+
+			case ACT_SEND_START:
+				TWCR = 0
+					| _BV(TWINT)
+					// | _BV(TWEA)
+					| _BV(TWSTA)
+					// | _BV(TWSTO)
+					// | _BV(TWWC)
+					| _BV(TWEN)
+					| _BV(TWIE)
+					;
+
+				break;
+
+			case ACT_SEND_ADDR_W:
+				TWDR = i2CAddrByte(slaveAddr,false);
+				TWCR = 0
 				| _BV(TWINT)
 				// | _BV(TWEA)
-				| _BV(TWSTA)
+				// | _BV(TWSTA)
 				// | _BV(TWSTO)
 				// | _BV(TWWC)
 				| _BV(TWEN)
 				| _BV(TWIE)
 				;
 
-			break;
-			
-		case ACT_SEND_ADDR_W:
-			TWDR = i2CAddrByte(slaveAddr,false);
-			TWCR = 0
-			| _BV(TWINT)
-			// | _BV(TWEA)
-			// | _BV(TWSTA)
-			// | _BV(TWSTO)
-			// | _BV(TWWC)
-			| _BV(TWEN)
-			| _BV(TWIE)
-			;
+				break;
 
-			break;
-			
-		case ACT_SEND_ADDR_R:
-			TWDR = i2CAddrByte(slaveAddr,true);
-			TWCR = 0
-			| _BV(TWINT)
-			// | _BV(TWEA)
-			// | _BV(TWSTA)
-			// | _BV(TWSTO)
-			// | _BV(TWWC)
-			| _BV(TWEN)
-			| _BV(TWIE)
-			;
+			case ACT_SEND_ADDR_R:
+				TWDR = i2CAddrByte(slaveAddr,true);
+				TWCR = 0
+				| _BV(TWINT)
+				// | _BV(TWEA)
+				// | _BV(TWSTA)
+				// | _BV(TWSTO)
+				// | _BV(TWWC)
+				| _BV(TWEN)
+				| _BV(TWIE)
+				;
 
-			break;
+				break;
 
-		case ACT_SEND_BYTE:
-			// Send the register number to read
-			TWDR = sendBuffer[currSendIndex];
-			TWCR = 0
-			| _BV(TWINT)
-			// | _BV(TWEA)
-			// | _BV(TWSTA)
-			// | _BV(TWSTO)
-			// | _BV(TWWC)
-			| _BV(TWEN)
-			| _BV(TWIE)
-			;
-			
-			if (lastSendIndex == currSendIndex) {
-				currStatusIndex = STAT_LAST_BYTE_SENT;
-			} else {
-				currSendIndex++;
-			}
+			case ACT_SEND_BYTE:
+				// Send the register number to read
+				TWDR = sendBuffer[currSendIndex];
+				TWCR = 0
+				| _BV(TWINT)
+				// | _BV(TWEA)
+				// | _BV(TWSTA)
+				// | _BV(TWSTO)
+				// | _BV(TWWC)
+				| _BV(TWEN)
+				| _BV(TWIE)
+				;
 
-			break;
+				if (lastSendIndex == currSendIndex) {
+					currStatusIndex = STAT_LAST_BYTE_SENT;
+					currSequenceStatus = &(currSequence[STAT_LAST_BYTE_SENT]);
+				} else {
+					currSendIndex++;
+				}
 
-		case ACT_RECV_BYTE_ACK:
-			// Receive byte, send ACK to slave
-			TWCR = 0
-			| _BV(TWINT)
-			| _BV(TWEA)
-			// | _BV(TWSTA)
-			// | _BV(TWSTO)
-			// | _BV(TWWC)
-			| _BV(TWEN)
-			| _BV(TWIE)
-			;
+				break;
 
-			break;
+			case ACT_RECV_BYTE_ACK:
+				// Receive byte, send ACK to slave
+				TWCR = 0
+				| _BV(TWINT)
+				| _BV(TWEA)
+				// | _BV(TWSTA)
+				// | _BV(TWSTO)
+				// | _BV(TWWC)
+				| _BV(TWEN)
+				| _BV(TWIE)
+				;
 
-		case ACT_RECV_BYTE_NACK:
-			// Receive byte, send NACK to slave
-			TWCR = 0
-			| _BV(TWINT)
-			// | _BV(TWEA)
-			// | _BV(TWSTA)
-			// | _BV(TWSTO)
-			// | _BV(TWWC)
-			| _BV(TWEN)
-			| _BV(TWIE)
-			;
+				break;
 
-			break;
+			case ACT_RECV_BYTE_NACK:
+				// Receive byte, send NACK to slave
+				TWCR = 0
+				| _BV(TWINT)
+				// | _BV(TWEA)
+				// | _BV(TWSTA)
+				// | _BV(TWSTO)
+				// | _BV(TWWC)
+				| _BV(TWEN)
+				| _BV(TWIE)
+				;
 
-		case ACT_SEND_STOP:
-			// Send stop
-			TWCR = 0
-			| _BV(TWINT)
-			// | _BV(TWEA)
-			// | _BV(TWSTA)
-			| _BV(TWSTO)
-			// | _BV(TWWC)
-			| _BV(TWEN)
-			| _BV(TWIE)
-			;
+				break;
 
-			transferActive = false;
-			I2CTransferFinished = true;
+			case ACT_SEND_STOP:
+				// Send stop
+				TWCR = 0
+				| _BV(TWINT)
+				// | _BV(TWEA)
+				// | _BV(TWSTA)
+				| _BV(TWSTO)
+				// | _BV(TWWC)
+				| _BV(TWEN)
+				| _BV(TWIE)
+				;
 
-			break;
+				// Transfer is finished here. Let the caller pick up results, and leave
+				xTaskNotifyGive(callerTask);
 
+				break;
+
+		}
 	}
-	
-	// proceed to the status for the next round.
-	currSequenceStatus = &(currSequence[currStatusIndex]);
-	
 }
 
+/** I2C interrupt handler
+ *
+ * Only task is to release the driver task to process the result, and the status machine.
+ *
+ */
+ISR(TWI_vect){
+	BaseType_t higherPrioTaskWoken = pdFALSE;
+	vTaskNotifyGiveFromISR(driverTask,&higherPrioTaskWoken);
+
+#if configUSE_PREEMPTION
+	if (higherPrioTaskWoken != pdFALSE) {
+		vPortYield();
+	}
+#endif
+
+}

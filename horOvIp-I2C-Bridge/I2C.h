@@ -13,12 +13,14 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-
+/** \brief Return code of all calls which send or receive data to or from the I2C slave
+ *
+ */
 enum I2CTransferResult {
-	I2C_RC_OK,
-	I2C_RC_ILLEGAL_SEQ,
-	I2C_RC_HW_ERROR,
-	I2C_RC_UNDEF
+	I2C_RC_OK,				//< Transfer successful
+	I2C_RC_ILLEGAL_SEQ,		//< An unexpected sequence code was encountered. Reason is a wrong status machine for the transfer.
+	I2C_RC_HW_ERROR,		//< Self explanory. Review the hardware error value returned from the call to this module.
+	I2C_RC_UNDEF			//< Unspecified error. Someting went wrong :)
 };
 
 enum I2CStatus {
@@ -34,19 +36,14 @@ enum I2CStatus {
 	STAT_STOP_SENT
 };
 
-/** Pointer to a callback function of the user
+/** \brief Initialize the interface and start the driver thread
  *
- * @param transferResult The the final result of a transfer
- * @param i2cHWStatusCode The status code of the I2C hardware when transferResult is not I2C_RC_OK.
- * Refer to the [ATMega1284P datasheet](http://ww1.microchip.com/downloads/en/DeviceDoc/ATmega164A_PA-324A_PA-644A_PA-1284_P_Data-Sheet-40002070A.pdf),
- * tables 21-3, pg. 224 and 21-4, pg. 227
- * @param errSeqStatus The sequence status when an error occurred
+ * This function **MUST** be called before any other call of this module.
+ * For efficiency there are not further checks if the initialization was done.
+ *
+ * @return true when successful, false if an error occurred. If false was returned the interface is unusable!
  */
-typedef void (*I2CTransferFinishedCallbPtr) (
-		enum I2CTransferResult transferResult,
-		uint8_t i2cHWStatusCode,
-		enum I2CStatus errSeqStatus
-);
+bool I2CInit();
 
 /** \brief Start a write-only transfer to an I2C slave.
  *
@@ -62,13 +59,21 @@ typedef void (*I2CTransferFinishedCallbPtr) (
  * @param slAddr 7-bit I2C slave address
  * @param data Pointer to the data being sent
  * @param dataLen \ref data length in bytes
- * @param callback Pointer to the callback function. Optional. If left NULL you must poll the transfer end yourself
+ * @param[out] i2cHWStatusCode The status code of the I2C hardware when return value is not I2C_RC_OK.
+ * Not written/undefined when return value is I2C_RC_OK
+ * You can pass NULL if you are not interested.
+ * @see See the [ATMega1284P datasheet](http://ww1.microchip.com/downloads/en/DeviceDoc/ATmega164A_PA-324A_PA-644A_PA-1284_P_Data-Sheet-40002070A.pdf),
+ * tables 21-3, pg. 224 and 21-4, pg. 227
+ * @param[out] errSeqStatus The sequence status when an error occurred
+ * You can pass NULL if you are not interested.
+ * @return the transfer result. \p pHWStatus and \p pErrSeqStatus provide more information when the result is not I2C_RC_OK
  */
-void I2CStartTransferSend (
+enum I2CTransferResult I2CTransferSend (
 		uint8_t slAddr,
 		uint8_t *data,
 		uint8_t dataLen,
-		I2CTransferFinishedCallbPtr callback);
+		uint8_t *pHWStatus,
+		enum I2CStatus *pErrSeqStatus);
 
 /**  \brief Start a write-read transfer to an I2C slave.
  *
@@ -86,13 +91,20 @@ void I2CStartTransferSend (
  * @param sendDataLen \ref sendData length in bytes
  * @param recvData Pointer to the data being sent
  * @param recvDataLen \ref recvData length in bytes
- * @param callback Pointer to the callback function. Optional. If left NULL you must poll the transfer end yourself
+ * @param[out] i2cHWStatusCode The status code of the I2C hardware when transferResult is not I2C_RC_OK.
+ * You can pass NULL if you are not interested.
+ * \see Refer to the [ATMega1284P datasheet](http://ww1.microchip.com/downloads/en/DeviceDoc/ATmega164A_PA-324A_PA-644A_PA-1284_P_Data-Sheet-40002070A.pdf),
+ * tables 21-3, pg. 224 and 21-4, pg. 227
+ * @param[out] errSeqStatus The sequence status when an error occurred
+ * You can pass NULL if you are not interested.
+ * @return the transfer result. \p pHWStatus and \p pErrSeqStatus provide more information when the result is not I2C_RC_OK
  */
-void I2CStartTransferSendReceive (
+enum I2CTransferResult I2CTransferSendReceive (
 	uint8_t slAddr,
 	uint8_t *sendData,uint8_t sendDataLen,
 	uint8_t *recvData,uint8_t recvDataLen,
-	I2CTransferFinishedCallbPtr callback);
+	uint8_t *pHWStatus,
+	enum I2CStatus *pErrSeqStatus);
 
 /** \brief Start a read-only transfer to an I2C slave.
  *
@@ -108,43 +120,18 @@ void I2CStartTransferSendReceive (
  * @param slAddr 7-bit I2C slave address
  * @param data Pointer to the buffer for receiving data
  * @param dataLen \ref data length in bytes
- * @param callback Pointer to the callback function. Optional. If left NULL you must poll the transfer end yourself
+ * @param[out] i2cHWStatusCode The status code of the I2C hardware when transferResult is not I2C_RC_OK.
+ * You can pass NULL if you are not interested.
+ * \see Refer to the [ATMega1284P datasheet](http://ww1.microchip.com/downloads/en/DeviceDoc/ATmega164A_PA-324A_PA-644A_PA-1284_P_Data-Sheet-40002070A.pdf),
+ * tables 21-3, pg. 224 and 21-4, pg. 227
+ * @param[out] errSeqStatus The sequence status when an error occurred
+ * You can pass NULL if you are not interested.
+ * @return the transfer result. \p pHWStatus and \p pErrSeqStatus provide more information when the result is not I2C_RC_OK
  */
-void I2CStartTransferReceive (uint8_t slAddr,
+enum I2CTransferResult I2CTransferReceive (uint8_t slAddr,
 		uint8_t *data,
 		uint8_t dataLen,
-		I2CTransferFinishedCallbPtr callback);
-
-/** \brief Check if an I2C transfer is active
- *
- * @return true when a transfer is active.
- */
-bool I2CIsTransferActive();
-
-/** \brief Wait until an I2C transfer has finished, and return the transfer results
- *
- * If an I2C transfer is active the function waits in a loop until the running transfer is finished.
- * Within the active wait loop the processor enters sleep mode because the transfer finish flag can only be set by the I2C interrupt handler.
- * If a transfer is already finished when this function is called the function returns immediately and returns the results of the last transfer.
- * If you call the function repeatedly without starting a new transfer the function will return the same results each time.
- *
- * You can poll for a transfer to finish without blocking with \ref I2CIsTransferActive(), and then call I2CWaitGetTransferResult to retrieve the results
- * without delay.
- *
- * @param pHWStatus
- * @param pErrSeqStatus
- * @return
- */
-enum I2CTransferResult I2CWaitGetTransferResult(
-	uint8_t *pHWStatus,
-	enum I2CStatus *pErrSeqStatus);
-
-/** \brief Periodic poll call to call application callbacks when a transfer has finished
- *
- * This function must be called each time in the main loop.
- * It checks if a callback is pending, and if a transfer finished. If both applies the callback is called and the set NULL.
- *
- */
-void I2CPoll();
+		uint8_t *pHWStatus,
+		enum I2CStatus *pErrSeqStatus);
 
 #endif /* I2C_H_ */
