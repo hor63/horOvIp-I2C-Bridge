@@ -72,17 +72,18 @@
  */
 #define TASK_PRIO_APP		3
 
-/** \brief Task priority for device drivers
- *
- * Driver code which is too large and runs too long to fit inside the ISR like the I2C driver
- */
-#define TASK_PRIO_DRIVERS	4
-
 /** \brief Task priority for timers for signaling and blinking
  *
  * Timers have high priority. They do not much more than switch the LED off or on.
  */
-#define TASK_PRIO_TIMERS	5
+#define TASK_PRIO_TIMERS	4
+
+/** \brief Task priority for device drivers
+ *
+ * Driver code which is too large and runs too long to fit inside the ISR like the I2C driver
+ * but shall run ASAP. Therefore highest application priority
+ */
+#define TASK_PRIO_DRIVERS	5
 
 #define configMINIMAL_STACK_SIZE	( ( unsigned short ) 200 )
 
