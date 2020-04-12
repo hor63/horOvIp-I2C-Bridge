@@ -91,7 +91,18 @@ static void initTask( void *pvParameters ) {
 	// Let other components start up safely, particularly the IMU but also other sensors
 	vTaskDelay(pdMS_TO_TICKS(1000));
 
-	//BMX160Init();
+	if (I2CInit()) {
+		BMX160Init();
+		vTaskDelay(pdMS_TO_TICKS(500));
+		// Do the initialization again.
+		// Reason is that the mag trim data are usually not readable on the first try.
+		// After all is being set up an running, I can soft-reset the IMU, and then
+		// read the trim data reliably.
+		// I do not know what is missing when I read the trim data for the first time compared to bringing up
+		// the mag sensor and the interface to full functionality.
+		// Frankly I do not care. It seems to work reliably on the second attempt, and that suffices for me.
+		BMX160Init();
+	}
 
 	// Let the data capturing get into the swing
 	vTaskDelay(pdMS_TO_TICKS(200));
@@ -160,6 +171,8 @@ static uint32_t getSysClocks() {
 }
 
 static void vStatisticsTimerFunction( TimerHandle_t xTimer ) {
+
+	return;
 
 	vPortGetHeapStats(&heapStats);
 
