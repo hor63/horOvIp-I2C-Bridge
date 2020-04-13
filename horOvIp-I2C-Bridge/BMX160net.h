@@ -43,6 +43,11 @@
  */
 #define MAKE_IP_PEER_ADDR_I2C_BRIDGE MAKE_IP_ADDR(192,168,203,1)
 
+/** \brief TCP port of the binary interface of the sensor box
+ *
+ */
+#define BMX_160_SENSOR_BOX_IP_PORT 19463
+
 /*!
  * @brief bmm150 trim data structure
  *
