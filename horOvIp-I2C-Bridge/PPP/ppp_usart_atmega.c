@@ -262,13 +262,16 @@ TPPPBufferIndex lNumInWriteBuffer;
 		debugAssertOut("Guard 2 modified","Guard2 ppp_usart_atmega.c",__LINE__);
 	}
 
-	if (xSemaphoreTake(ppp_usart_atmegaWriteMutex,pdMS_TO_TICKS(5000)) != pdTRUE) {
+	if (xSemaphoreTake(ppp_usart_atmegaWriteMutex,portMAX_DELAY) != pdTRUE) {
 		// Someone is blocking the sender overly long
 		// should never happen. This should be the callback from the LWIP task only
 		DEBUG_OUT("Send: Mutex timeout\r\n");
 		return 0;
 	}
 
+	DEBUG_OUT("PPPUsartSend len = ");
+	DEBUG_UINT_OUT((unsigned int)len);
+	DEBUG_OUT("\r\n");
 	for (;;) {
 		// Get a local snapshot of the administrative data
 		portENTER_CRITICAL();
@@ -320,10 +323,10 @@ TPPPBufferIndex lNumInWriteBuffer;
 
 			// ensure that memory is written from the registers before leaving the critical section.
 			portMEMORY_BARRIER();
-			portEXIT_CRITICAL();
 
 			// Enable the send buffer empty interrupt thus starting the sender
 			UCSR0B |= _BV(UDRIE0);
+			portEXIT_CRITICAL();
 
 			if (remainingLen == 0) {
 				// Leave the loop. You are done here.
@@ -333,7 +336,7 @@ TPPPBufferIndex lNumInWriteBuffer;
 			if (waitingWriteTask) {
 				// Wait for the write ISR to empty the buffer
 				// Or just try again after 100ms.
-				ulTaskNotifyTake(pdTRUE,pdMS_TO_TICKS(100));
+				ulTaskNotifyTake(pdTRUE,pdMS_TO_TICKS(1000));
 			}
 
 		}
@@ -343,6 +346,7 @@ TPPPBufferIndex lNumInWriteBuffer;
 //	DEBUG_OUT("Send: ");
 //	DEBUG_INT_OUT((int)len);
 //	DEBUG_OUT("\r\n");
+	DEBUG_OUT("PPPUsartSend done \r\n");
 
 	xSemaphoreGive(ppp_usart_atmegaWriteMutex);
 	return len;

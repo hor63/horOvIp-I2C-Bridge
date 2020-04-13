@@ -256,7 +256,7 @@ static void status_cb(ppp_pcb *pcb, int err_code, void *ctx) {
 }
 
 
-#define MAKE_IP_ADDR(a1,a2,a3,a4) PP_HTONL(LWIP_MAKEU32(a,b,c,d))
+#define MAKE_IP_ADDR(a1,a2,a3,a4) PP_HTONL(LWIP_MAKEU32(a1,a2,a3,a4))
 
 void pppAppInit() {
 
