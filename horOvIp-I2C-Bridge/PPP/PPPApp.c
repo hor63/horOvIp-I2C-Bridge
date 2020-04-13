@@ -17,6 +17,7 @@
 #include "netif/ppp/pppapi.h"
 
 #include "PPP/ppp_usart_atmega.h"
+#include "BMX160net.h"
 
 
 /* The PPP control block */
@@ -255,6 +256,8 @@ static void status_cb(ppp_pcb *pcb, int err_code, void *ctx) {
 }
 
 
+#define MAKE_IP_ADDR(a1,a2,a3,a4) PP_HTONL(LWIP_MAKEU32(a,b,c,d))
+
 void pppAppInit() {
 
 	/*
@@ -290,7 +293,8 @@ void pppAppInit() {
 	ip4_addr_t addr;
 
 	/* Set our address */
-	IP4_ADDR(&addr, 192,168,203,2);
+	addr.addr = MAKE_IP_ADDR_I2C_BRIDGE;
+	//IP4_ADDR(&addr, 192,168,203,2);
     DEBUG_OUT_START_MSG();
     DEBUG_OUT("ppp_set_ipcp_ouraddr");
     DEBUG_OUT_END_MSG();
@@ -298,7 +302,8 @@ void pppAppInit() {
 	ppp_set_ipcp_ouraddr(ppp, &addr);
 
 	/* Set peer(his) address */
-	IP4_ADDR(&addr, 192,168,203,1);
+	addr.addr = MAKE_IP_PEER_ADDR_I2C_BRIDGE;
+	//IP4_ADDR(&addr, 192,168,203,1);
     DEBUG_OUT_START_MSG();
     DEBUG_OUT("ppp_set_ipcp_hisaddr");
     DEBUG_OUT_END_MSG();
