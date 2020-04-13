@@ -32,21 +32,12 @@ void BMX160StartDataCapturing();
  */
 void BMX160StopDataCapturing();
 
-/** \brief Are valid data present
- *
- * Valid data can be retrieved with \ref BMX160GetData()
- * Data are initially invalid and when \ref BMX160readoutSensors() is called until the new data are present
- *
- * @return true If valid sensor data are present
- */
-bool BMX160IsDataValid();
-
 /** Start reading sensor data.
  *
- * This call is asynchronous. Processing depends on cyclic calls to \ref I2CPoll()
- * You can poll the success with \ref BMX160IsDataPresent() or directly \ref BMX160GetData()
+ * This call is synchronous.
+ * You can access the data with \ref BMX160GetData()
  */
-void BMX160readoutSensors();
+void BMX160ReadoutSensors();
 
 /** \brief Read the magnetometer factory trim registers
  *

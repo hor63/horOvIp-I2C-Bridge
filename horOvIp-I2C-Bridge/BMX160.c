@@ -54,9 +54,6 @@
 
 static struct BMX160Data bmx160Data;
 
-static bool dataValid = false;
-static bool transferRunning = false;
-
 static uint8_t dataBuf [32];
 
 // Raw trim registers are being read at the startup
@@ -408,8 +405,6 @@ static void readSensorDataWithoutMag() {
 			DEBUG_OUT("\r\n");
 		/* */
 
-		dataValid = true;
-		transferRunning = false;
 	}
 }
 
@@ -444,10 +439,8 @@ static void readSensorDataWithMag() {
 		bmx160Data.accGyrMagData.magZ = readMagValueZ(dataBuf + (BMX160_DATA_MAG_Z_LSB_OFFS));
 		bmx160Data.accGyrMagData.magRHall = readMagValueRHall(dataBuf + (BMX160_DATA_RHALL_LSB_OFFS));
 
-		dataValid = true;
-		transferRunning = false;
 
-	/* */
+	/* +/
 		DEBUG_OUT("Sensor data with Mag, len = ");
 		DEBUG_UINT_OUT(bmx160Data.header.length);
 		DEBUG_OUT(", AccX = ");
@@ -457,64 +450,11 @@ static void readSensorDataWithMag() {
 		DEBUG_OUT(", MagX = ");
 		DEBUG_INT_OUT(bmx160Data.accGyrMagData.magX);
 		DEBUG_OUT("\r\n");
-	/* */
+	/+ */
 	}
 
 }
 
-static void readSensorData() {
-
-	// How often did you read the status before new data were present?
-	uint16_t numReadStatus = 0;
-	enum I2CTransferResult transferResult;
-
-	// Wait for data become ready. At least Gyro and Accel are always there when data are there at all.
-	do {
-		dataBuf[0] = BMX160_STATUS_REG;
-
-		transferResult = I2CTransferSendReceive(BMX160ADDR,dataBuf,1,dataBuf,1,NULL,NULL);
-		if (transferResult != I2C_RC_OK) {
-			break;
-		}
-		numReadStatus ++;
-	}	while ((dataBuf[0] & (1<<BMX160_STATUS_DRDY_ACC | 1<<BMX160_STATUS_DRDY_GYR)) != (1<<BMX160_STATUS_DRDY_ACC | 1<<BMX160_STATUS_DRDY_GYR));
-
-
-	if (transferResult == I2C_RC_OK) {
-
-		// At least Gyro and and Accel data are there.
-
-/* */
-		DEBUG_OUT("New data present. Number status reads = ");
-		DEBUG_UINT_OUT(numReadStatus);
-		DEBUG_OUT("\r\n");
-/* */
-		if (dataBuf[0] & (1<<BMX160_STATUS_DRDY_MAG)) {
-			// Mag data are present too.
-			readSensorDataWithMag();
-		} else {
-			// Read only gyro and accel.
-			readSensorDataWithoutMag();
-		}
-	}
-}
-
-/** Start reading sensor data.
- *
- * This call is synchronous.
- * You can poll the success with \ref BMX160IsDataPresent() or directly \ref BMX160GetData()
- */
-static void readoutSensors() {
-
-	// Avoid nesting readouts. Sensor reading should be waaaay faster then the timer but you never know
-	if (!transferRunning) {
-		dataValid = false;
-		transferRunning = true;
-		// First read the status until all sensor data are present
-		readSensorData();
-	}
-
-}
 
 /** \brief Read the raw trim values from the sensor NVRAM
  *
@@ -580,7 +520,7 @@ void BMX160Init() {
 	configMag();
 
 	vTaskDelay(pdMS_TO_TICKS(200));
-	readoutSensors();
+	BMX160ReadoutSensors();
 }
 
 // Copied with some modification from the Bosch BMM150 driver
@@ -614,11 +554,6 @@ void BMX160ReadTrimRegisters()
 	bmx160Data.header.sensorTime2 = 0;
 	bmx160Data.header.length = sizeof(bmx160Data.header) + sizeof(bmx160Data.trimData);
 
-	// Use the content of bmx160Data containing the trim data immediately.
-	// Until the next measurement cycle passes consider the data invalid as measurement data, and
-	// prevent sending the trim data as cyclic data.
-	dataValid = false;
-
 }
 
 
@@ -634,9 +569,41 @@ void BMX160StopDataCapturing() {
 
 }
 
+void BMX160ReadoutSensors() {
 
-bool BMX160IsDataValid(){
-	return dataValid;
+	// How often did you read the status before new data were present?
+	uint16_t numReadStatus = 0;
+	enum I2CTransferResult transferResult;
+
+	// Wait for data become ready. At least Gyro and Accel are always there when data are there at all.
+	do {
+		dataBuf[0] = BMX160_STATUS_REG;
+
+		transferResult = I2CTransferSendReceive(BMX160ADDR,dataBuf,1,dataBuf,1,NULL,NULL);
+		if (transferResult != I2C_RC_OK) {
+			break;
+		}
+		numReadStatus ++;
+	}	while ((dataBuf[0] & (1<<BMX160_STATUS_DRDY_ACC | 1<<BMX160_STATUS_DRDY_GYR)) != (1<<BMX160_STATUS_DRDY_ACC | 1<<BMX160_STATUS_DRDY_GYR));
+
+
+	if (transferResult == I2C_RC_OK) {
+
+		// At least Gyro and and Accel data are there.
+
+/* +/
+		DEBUG_OUT("New data present. Number status reads = ");
+		DEBUG_UINT_OUT(numReadStatus);
+		DEBUG_OUT("\r\n");
+/+ */
+		if (dataBuf[0] & (1<<BMX160_STATUS_DRDY_MAG)) {
+			// Mag data are present too.
+			readSensorDataWithMag();
+		} else {
+			// Read only gyro and accel.
+			readSensorDataWithoutMag();
+		}
+	}
 }
 
 struct BMX160Data* BMX160GetData(){
