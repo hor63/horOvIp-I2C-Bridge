@@ -53,7 +53,7 @@
 #define configMAX_PRIORITIES		( 6 )
 // In config.h
 // #define configMINIMAL_STACK_SIZE	( ( unsigned short ) 400 )
-#define configTOTAL_HEAP_SIZE		( (size_t ) (  10000 ) )
+#define configTOTAL_HEAP_SIZE		( (size_t ) (  9500 ) )
 #define configMAX_TASK_NAME_LEN		( 16 )
 #define configUSE_16_BIT_TICKS		0
 #define configIDLE_SHOULD_YIELD		0
