@@ -269,17 +269,24 @@ TPPPBufferIndex lNumInWriteBuffer;
 		return 0;
 	}
 
+	/*
 	DEBUG_OUT("PPPUsartSend len = ");
 	DEBUG_UINT_OUT((unsigned int)len);
 	DEBUG_OUT("\r\n");
+	*/
 	for (;;) {
 		// Get a local snapshot of the administrative data
 		portENTER_CRITICAL();
 		waitingWriteTask = NULL;
-		portMEMORY_BARRIER();
-		lWriteBufferDataStart = writeBufferDataStart;
-		lWriteBufferFreeStart = writeBufferFreeStart;
 		lNumInWriteBuffer = numInWriteBuffer;
+		if (lNumInWriteBuffer == 0) {
+			lWriteBufferDataStart = writeBufferDataStart = 0;
+			lWriteBufferFreeStart = writeBufferFreeStart = 0;
+		} else {
+			lWriteBufferDataStart = writeBufferDataStart;
+			lWriteBufferFreeStart = writeBufferFreeStart;
+		}
+		portMEMORY_BARRIER();
 		portEXIT_CRITICAL();
 		// Is there space in the buffer at all?
 		if (lNumInWriteBuffer < PPP_BUFFER_SIZE) {
@@ -346,7 +353,7 @@ TPPPBufferIndex lNumInWriteBuffer;
 //	DEBUG_OUT("Send: ");
 //	DEBUG_INT_OUT((int)len);
 //	DEBUG_OUT("\r\n");
-	DEBUG_OUT("PPPUsartSend done \r\n");
+// 	DEBUG_OUT("PPPUsartSend done \r\n");
 
 	xSemaphoreGive(ppp_usart_atmegaWriteMutex);
 	return len;
@@ -355,46 +362,61 @@ TPPPBufferIndex lNumInWriteBuffer;
 
 static void readerTaskFunc(void* ctx) {
 	ppp_pcb *ppp = (ppp_pcb *)ctx;
-	TPPPBufferIndex lReadBufferFreeStart;
 	TPPPBufferIndex lReadBufferDataStart;
 	TPPPBufferIndex lNumInReadBuffer;
 
 
 	for (;;) {
-		// uint32_t taskNotifyRC = ulTaskNotifyTake(pdTRUE,pdMS_TO_TICKS(1000));
-		ulTaskNotifyTake(pdTRUE,pdMS_TO_TICKS(100));
+		uint32_t taskNotifyRC = ulTaskNotifyTake(pdFALSE,pdMS_TO_TICKS(300));
 
 		TPPPBufferIndex readBlockLen;
 		portENTER_CRITICAL();
-		lReadBufferFreeStart = readBufferFreeStart;
 		lReadBufferDataStart = readBufferDataStart;
 		lNumInReadBuffer = numInReadBuffer;
 		portEXIT_CRITICAL();
 
 		if (lNumInReadBuffer > 0) {
-			if (lReadBufferDataStart > lReadBufferFreeStart) {
+			if (lReadBufferDataStart + lNumInReadBuffer > PPP_BUFFER_SIZE) {
 				// There is a wrap-around in the read data
 				readBlockLen = PPP_BUFFER_SIZE - lReadBufferDataStart;
 			} else {
-				readBlockLen = numInReadBuffer;
+				readBlockLen = lNumInReadBuffer;
 			}
 
-//			if (taskNotifyRC == 0) {
-//				DEBUG_OUT("ReciveTO: ");
-//			} else {
-//				DEBUG_OUT("Recive: ");
-//			}
-//			DEBUG_INT_OUT((int)readBlockLen);
-//			DEBUG_OUT("\r\n");
+			/*
+			if (taskNotifyRC == 0) {
+				DEBUG_OUT("ReciveTO: ");
+			} else {
+				DEBUG_OUT("Recive: ");
+			}
+			DEBUG_UINT_OUT((unsigned int)readBlockLen);
+			DEBUG_OUT(" lNumInReadBuffer = ");
+			DEBUG_UINT_OUT((unsigned int)lNumInReadBuffer);
+			DEBUG_OUT(" lReadBufferDataStart = ");
+			DEBUG_UINT_OUT((unsigned int)lReadBufferDataStart);
+			DEBUG_OUT("\r\n");
+			*/
 
 			pppos_input_tcpip(ppp,readBuffer + lReadBufferDataStart,readBlockLen);
 
 			portENTER_CRITICAL();
+			portMEMORY_BARRIER();
+
 			numInReadBuffer -= readBlockLen;
-			readBufferDataStart += readBlockLen;
-			if (readBufferDataStart >= PPP_BUFFER_SIZE) {
-				readBufferDataStart = 0;
+			lNumInReadBuffer = numInReadBuffer;
+
+			if (lNumInReadBuffer == 0) {
+				// Reset the data pointers to avoid wrap-arounds whenever possible
+				lReadBufferDataStart = 0;
+				readBufferFreeStart = 0;
+			} else {
+				lReadBufferDataStart += readBlockLen;
+				if (lReadBufferDataStart >= PPP_BUFFER_SIZE) {
+					lReadBufferDataStart = 0;
+				}
 			}
+			readBufferDataStart = lReadBufferDataStart;
+
 			portMEMORY_BARRIER();
 			portEXIT_CRITICAL();
 		}
