@@ -174,7 +174,7 @@ static uint32_t getSysClocks() {
 
 static void vStatisticsTimerFunction( TimerHandle_t xTimer ) {
 
-	//return;
+	return;
 
 	vPortGetHeapStats(&heapStats);
 
@@ -360,19 +360,19 @@ static void tcpReadTask( void *pvParameters ) {
 		while (err == ERR_OK && connectedConn != NULL){
 			err = netconn_recv((struct netconn *)connectedConn,&buf);
 			if (err == ERR_OK) {
-				DEBUG_OUT("TCP recv");
+//				DEBUG_OUT("TCP recv");
 				if (buf != NULL) {
 					netbuf_first(buf);
 					do {
 						void* ptr;
 						u16_t len = 0;
 						if (netbuf_data(buf,&ptr,&len) == ERR_OK) {
-							DEBUG_OUT ("\r\n  len = ");
-							DEBUG_UINT_OUT(len);
+//							DEBUG_OUT ("\r\n  len = ");
+//							DEBUG_UINT_OUT(len);
 						}
 					} while (netbuf_next(buf) != -1);
 				}
-				DEBUG_OUT ("\r\n");
+//				DEBUG_OUT ("\r\n");
 
 			}
 			if (buf != NULL) {
@@ -440,7 +440,6 @@ static void tcpMainLoop(){
 				DEBUG_UINT_OUT(bmx160Data->header.length);
 				DEBUG_OUT(" bytes\r\n");
 				/+ */
-
 				vTaskDelayUntil(&lastTick,pdMS_TO_TICKS(20/*(1000/BMX160ODR)*/));
 
 				BMX160ReadoutSensors();
@@ -452,9 +451,11 @@ static void tcpMainLoop(){
 
 			}
 
+			/*
 			DEBUG_OUT("TCP send, err =");
 			DEBUG_INT_OUT((int)err);
 			DEBUG_OUT("\r\n");
+			*/
 
 			// Close the connection.
 	    	netconn_close((struct netconn *)connectedConn);
