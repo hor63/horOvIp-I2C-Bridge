@@ -606,7 +606,10 @@ void readTrimRegistersRawValues()
 
 	/* Trim register value is read */
 	readMagRegisters(trim_x1y1,BMM150_DIG_X1_REG,2);
-	readMagRegisters(trim_xyz_data,BMM150_DIG_Z4_LSB_REG,4);
+
+	// 4-byte burst is not supported. Therefore 2 2-byte bursts.
+	readMagRegisters(trim_xyz_data,BMM150_DIG_Z4_LSB_REG,2);
+	readMagRegisters(trim_xyz_data + 2,BMM150_DIG_Z4_LSB_REG + 2,2);
 	// The original read 10 bytes.
 	// Since the indirect burst read only supports 8 bytes I read 8 and 2 bytes.
 	readMagRegisters(trim_xy1xy2,BMM150_DIG_Z2_LSB_REG,8);
