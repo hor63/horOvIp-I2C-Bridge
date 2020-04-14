@@ -99,6 +99,12 @@ int main(void) {
 	// Let the data capturing get into the swing
 	_delay_ms(200);
 
+	// Repeat the initialization to read the mag trim registers after a power-up reset.
+	BMX160Init();
+
+	// Let the data capturing get into the swing
+	_delay_ms(200);
+
 	slipStart();
 
 	BMX160StartDataCapturing();
