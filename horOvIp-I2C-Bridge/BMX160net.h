@@ -17,6 +17,11 @@
 #define BMX160_SENSORBOX_MSG_VERSION_MAJOR 0
 #define BMX160_SENSORBOX_MSG_VERSION_MINOR 1
 
+/** \brief TCP port for the BMX160 sensor box
+ * 
+ */
+#define PORT_I2C_BRIDGE 19463
+
 /** \brief IP Address of the sensor box
  *
  * \note Please note that this must be written as a macro.

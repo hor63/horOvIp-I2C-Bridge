@@ -144,7 +144,7 @@ int main(void) {
 		MAKE_IP_PEER_ADDR_I2C_BRIDGE;
 		uip_setdraddr(&addr);
 	}
-	uip_listen(HTONS(19463));
+	uip_listen(HTONS(PORT_I2C_BRIDGE));
 
 	// Start interrupts here
 	sei();
