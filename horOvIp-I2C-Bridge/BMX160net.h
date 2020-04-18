@@ -131,7 +131,10 @@ struct BMX160Data {
 	uint8_t sensorTime0;
 	uint8_t sensorTime1;
 	uint8_t sensorTime2;
+	uint8_t versionMajor;
+	uint8_t versionMinor;
 	uint16_t length;
+	uint16_t crc;
 	} header;
 	union {
 		struct bmm150_trim_registers trimData;
