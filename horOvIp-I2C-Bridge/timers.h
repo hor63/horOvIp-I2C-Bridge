@@ -12,7 +12,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include <config.h>
+#include "config.h"
 
 /** \brief Function pointer type for timer tick callback function
  *
