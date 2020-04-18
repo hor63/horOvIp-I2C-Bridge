@@ -1,0 +1,6 @@
+eclipse.preferences.version=1
+environment/project/mcu.config.gnu.debug.toolchain.650267635/PATH/delimiter=;
+environment/project/mcu.config.gnu.debug.toolchain.650267635/PATH/operation=replace
+environment/project/mcu.config.gnu.debug.toolchain.650267635/PATH/value=C\:\\Programs\\AtmelStudio\\toolchain\\avr8\\avr8-gnu-toolchain\\bin;C\:\\Program Files (x86)\\Atmel\\Studio\\7.0\\shellutils
+environment/project/mcu.config.gnu.debug.toolchain.650267635/append=true
+environment/project/mcu.config.gnu.debug.toolchain.650267635/appendContributed=true
