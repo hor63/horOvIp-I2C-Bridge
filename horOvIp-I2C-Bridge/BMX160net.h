@@ -14,8 +14,8 @@
 
 #include <inttypes.h>
 
-#define BMX160_SENSORBOX_MSG_VERSION_MAJOR 0
-#define BMX160_SENSORBOX_MSG_VERSION_MINOR 1
+#define BMX160_SENSORBOX_MSG_VERSION_MAJOR 1
+#define BMX160_SENSORBOX_MSG_VERSION_MINOR 0
 
 /** \brief TCP port for the BMX160 sensor box
  * 
@@ -182,6 +182,14 @@ struct BMX160RecvData {
 		uint8_t unionCode;
 		uint8_t filler;
 		uint16_t length;
+		uint8_t versionMajor;
+		uint8_t versionMinor;
+		/** Use the CRC-16-CCITT
+		 *
+		 * \see [Wikipedia](https://en.wikipedia.org/wiki/Cyclic_redundancy_check#Implementations): CRC-16-CCITT
+		 * \see [CRC-16 CCIT](http://http://reveng.sourceforge.net/crc-catalogue/all.htm#crc.cat.crc-16-ibm-3740)
+		 */
+		uint16_t crc;
 		} header;
 	union {
 		uint8_t dummy;

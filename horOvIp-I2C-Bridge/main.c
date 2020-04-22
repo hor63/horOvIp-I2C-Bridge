@@ -228,54 +228,62 @@ static bool processTCPMessage() {
 	struct BMX160Data* bmx160Data;
 	
 	if (uip_len == recvData->header.length) {
-		// Seems legit
-		switch (recvData->header.unionCode) {
-			case BMX160RECV_DATA_RESET_IMU:
+		uint16_t crc = recvData->header.crc;
+		recvData->header.crc = 0U;
+		if (crc == crcBlock(PPP_INITFCS,recvData,recvData->header.length) &&
+			recvData->header.versionMajor == BMX160_SENSORBOX_MSG_VERSION_MAJOR &&
+			recvData->header.versionMinor == BMX160_SENSORBOX_MSG_VERSION_MINOR
+			) {
+			// Seems legit
+			switch (recvData->header.unionCode) {
+				case BMX160RECV_DATA_RESET_IMU:
 			
-				// Stop the periodic data capturing temporarily
-				BMX160StopDataCapturing();
+					// Stop the periodic data capturing temporarily
+					BMX160StopDataCapturing();
 
-				BMX160Init();
-				BMX160ReadTrimRegisters();
-				bmx160Data = BMX160GetData();				
+					BMX160Init();
+					BMX160ReadTrimRegisters();
+					bmx160Data = BMX160GetData();				
 				
-				if (uip_mss() >= bmx160Data->header.length) {
-					bmx160Data->header.versionMajor = BMX160_SENSORBOX_MSG_VERSION_MAJOR;
-					bmx160Data->header.versionMinor = BMX160_SENSORBOX_MSG_VERSION_MINOR;
-					bmx160Data->header.crc = 0;
-					bmx160Data->header.crc = crcBlock(PPP_INITFCS,bmx160Data,bmx160Data->header.length);
-					uip_send (bmx160Data,bmx160Data->header.length);
-					rc = true;
-				}
+					if (uip_mss() >= bmx160Data->header.length) {
+						bmx160Data->header.versionMajor = BMX160_SENSORBOX_MSG_VERSION_MAJOR;
+						bmx160Data->header.versionMinor = BMX160_SENSORBOX_MSG_VERSION_MINOR;
+						bmx160Data->header.crc = 0;
+						bmx160Data->header.crc = crcBlock(PPP_INITFCS,bmx160Data,bmx160Data->header.length);
+						uip_send (bmx160Data,bmx160Data->header.length);
+						rc = true;
+					}
 				
-				// restart the data capture
-				BMX160StartDataCapturing();
+					// restart the data capture
+					BMX160StartDataCapturing();
 				
-				break;
+					break;
 			
-			case BMX160RECV_DATA_RESEND_MAG_TRIM_DATA:
+				case BMX160RECV_DATA_RESEND_MAG_TRIM_DATA:
 
-				// Stop the periodic data capturing temporarily
-				BMX160StopDataCapturing();
+					// Stop the periodic data capturing temporarily
+					BMX160StopDataCapturing();
 				
-				BMX160ReadTrimRegisters();
-				bmx160Data = BMX160GetData();
+					BMX160ReadTrimRegisters();
+					bmx160Data = BMX160GetData();
 				
-				if (uip_mss() >= bmx160Data->header.length) {
-					bmx160Data->header.versionMajor = BMX160_SENSORBOX_MSG_VERSION_MAJOR;
-					bmx160Data->header.versionMinor = BMX160_SENSORBOX_MSG_VERSION_MINOR;
-					bmx160Data->header.crc = 0;
-					bmx160Data->header.crc = crcBlock(PPP_INITFCS,bmx160Data,bmx160Data->header.length);
-					uip_send (bmx160Data,bmx160Data->header.length);
-					rc = true;
-				}
+					if (uip_mss() >= bmx160Data->header.length) {
+						bmx160Data->header.versionMajor = BMX160_SENSORBOX_MSG_VERSION_MAJOR;
+						bmx160Data->header.versionMinor = BMX160_SENSORBOX_MSG_VERSION_MINOR;
+						bmx160Data->header.crc = 0;
+						bmx160Data->header.crc = crcBlock(PPP_INITFCS,bmx160Data,bmx160Data->header.length);
+						uip_send (bmx160Data,bmx160Data->header.length);
+						rc = true;
+					}
 				
-				// restart the data capture
-				BMX160StartDataCapturing();
+					// restart the data capture
+					BMX160StartDataCapturing();
 			
-				break;
-			default:
-				break;
+					break;
+				default:
+					// Includes BMX160RECV_DATA_NONE which I can safely ignore
+					break;
+			}
 		}
 	}
 	
