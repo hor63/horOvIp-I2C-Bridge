@@ -601,6 +601,7 @@ ISR(TWI_vect){
 				//	vTaskNotifyGiveFromISR(driverTask,&higherPrioTaskWoken);
 				if (callerTask) {
 					vTaskNotifyGiveFromISR(callerTask,&higherPrioTaskWoken);
+					callerTask = NULL;
 				}
 
 				break;
