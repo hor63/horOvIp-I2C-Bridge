@@ -60,7 +60,7 @@ int main(void) {
 
 	xTaskCreate( mainTask, "TCPMain", configMINIMAL_STACK_SIZE * 2, NULL, TASK_PRIO_APP, NULL );
 	testTimer = xTimerCreate("Blinky",33,pdTRUE,vTestTimerFunction,vTestTimerFunction);
-	statisticsTimer = xTimerCreate("Statistics",pdMS_TO_TICKS(5000),pdTRUE,vStatisticsTimerFunction,vStatisticsTimerFunction);
+	statisticsTimer = xTimerCreate("Statistics",5000/portTICK_PERIOD_MS,pdTRUE,vStatisticsTimerFunction,vStatisticsTimerFunction);
 	xTimerStart(testTimer,10);
 	xTimerStart(statisticsTimer,10);
 
@@ -92,11 +92,11 @@ static void mainTask( void *pvParameters ) {
 	DEBUG_OUT_END_MSG();
 
 	// Let other components start up safely, particularly the IMU but also other sensors
-	vTaskDelay(pdMS_TO_TICKS(1000));
+	vTaskDelay(1000/portTICK_PERIOD_MS);
 
 	if (I2CInit()) {
 		BMX160Init();
-		vTaskDelay(pdMS_TO_TICKS(500));
+		vTaskDelay(500/portTICK_PERIOD_MS);
 		// Do the initialization again.
 		// Reason is that the mag trim data are usually not readable on the first try.
 		// After all is being set up an running, I can soft-reset the IMU, and then
@@ -108,7 +108,7 @@ static void mainTask( void *pvParameters ) {
 	}
 
 	// Let the data capturing get into the swing
-	vTaskDelay(pdMS_TO_TICKS(200));
+	vTaskDelay(200/portTICK_PERIOD_MS);
 
 	//BMX160StartDataCapturing();
 
@@ -116,7 +116,7 @@ static void mainTask( void *pvParameters ) {
 	DEBUG_OUT("Startup TCPIP");
 	DEBUG_OUT_END_MSG();
 
-	vTaskDelay(pdMS_TO_TICKS(200));
+	vTaskDelay(200/portTICK_PERIOD_MS);
 
 	tcpip_init(tcpipInitDoneCb, xTaskGetCurrentTaskHandle());
 
@@ -440,9 +440,11 @@ static void tcpMainLoop(){
 				DEBUG_UINT_OUT(bmx160Data->header.length);
 				DEBUG_OUT(" bytes\r\n");
 				/+ */
-				vTaskDelayUntil(&lastTick,pdMS_TO_TICKS(20/*(1000/BMX160ODR)*/));
+				vTaskDelayUntil(&lastTick,15/portTICK_PERIOD_MS);
 
 				BMX160ReadoutSensors();
+				// I wait 15 ms from now, after data are actually valid.
+				lastTick = xTaskGetTickCount();
 				bytesWritten = 0;
 				err = netconn_write_partly((struct netconn *)connectedConn,bmx160Data,bmx160Data->header.length,NETCONN_COPY,&bytesWritten);
 				DEBUG_OUT("bytesWritten = ");
@@ -472,7 +474,7 @@ static void tcpMainLoop(){
 	    	netconn_close(listenConn);
 	    	netconn_delete(listenConn);
 
-	    	vTaskDelay(pdMS_TO_TICKS(500));
+	    	vTaskDelay(500/portTICK_PERIOD_MS);
 	    }
 
 	}
