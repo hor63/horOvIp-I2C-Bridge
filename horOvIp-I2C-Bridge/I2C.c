@@ -214,9 +214,8 @@ static uint8_t i2cHWStatusCode = 0;
 static enum I2CStatus errSeqStatus = STAT_IDLE;
 
 static SemaphoreHandle_t i2CMux = 0;
-static TaskHandle_t driverTask = 0;
 static TaskHandle_t callerTask = 0;
-static void i2CDriverTask( void *pvParameters );
+// static void i2CDriverTask( void *pvParameters );
 
 bool I2CInit() {
 
@@ -229,12 +228,10 @@ bool I2CInit() {
 		return false;
 	}
 
-	if (!driverTask) {
-		if (xTaskCreate(i2CDriverTask,"I2CDriver",100,NULL,TASK_PRIO_DRIVERS,&driverTask) != pdPASS) {
-			DEBUG_OUT("I2CInit: driverTask creation FAILED!\r\n");
-			return false;
-		}
-	}
+	// Set data rate.
+	TWBR = (uint8_t)(TWI_BIT_RATE_REG_VAL);
+	// Set the prescaler to 0
+	TWSR &= ~(_BV(TWPS1) | _BV(TWPS0));
 
 	return true;
 }
@@ -412,28 +409,26 @@ enum I2CTransferResult I2CTransferReceive (uint8_t slAddr,
 	return rc;
 }
 
-static void i2CDriverTask( void *pvParameters ) {
+
+/** I2C interrupt handler
+ *
+ * Only task is to release the driver task to process the result, and the status machine.
+ *
+ */
+ISR(TWI_vect){
+	BaseType_t higherPrioTaskWoken = pdFALSE;
 
 	uint8_t actualHWStatus;
 	uint8_t expectedHWStatus;
 	enum I2CAction action;
-	
-	for (;;) {
-
-		//// Arghh! A label!
-		loopStart:;
-
-		// Wait for the interrupt handler
-		ulTaskNotifyTake(pdTRUE,portMAX_DELAY);
-
 
 		if (!currSequence || !currSequenceStatus) {
 			// Switch I2C off.
 			TWCR = 0;
 			currSequence = currSequenceStatus = NULL;
 			// Uh, oh, a goto.
-			// Justified here for simplicity. I cannot return, I *must* continue the loop at the start.
-			goto loopStart;
+			// Justified here for simplicity and a fast but clean exit out of the ISR
+			goto end;
 		}
 
 		// When reading the byte is ready to be picked up.
@@ -603,22 +598,14 @@ static void i2CDriverTask( void *pvParameters ) {
 				;
 
 				// Transfer is finished here. Let the caller pick up results, and leave
-				xTaskNotifyGive(callerTask);
+				//	vTaskNotifyGiveFromISR(driverTask,&higherPrioTaskWoken);
+				if (callerTask) {
+					vTaskNotifyGiveFromISR(callerTask,&higherPrioTaskWoken);
+				}
 
 				break;
 
 		}
-	}
-}
-
-/** I2C interrupt handler
- *
- * Only task is to release the driver task to process the result, and the status machine.
- *
- */
-ISR(TWI_vect){
-	BaseType_t higherPrioTaskWoken = pdFALSE;
-	vTaskNotifyGiveFromISR(driverTask,&higherPrioTaskWoken);
 
 #if configUSE_PREEMPTION
 	if (higherPrioTaskWoken != pdFALSE) {
@@ -626,4 +613,5 @@ ISR(TWI_vect){
 	}
 #endif
 
+end:;
 }
