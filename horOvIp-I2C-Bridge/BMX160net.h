@@ -14,6 +14,13 @@
 
 #include <inttypes.h>
 
+#define BMX160_SENSORBOX_MSG_VERSION_MAJOR 1
+#define BMX160_SENSORBOX_MSG_VERSION_MINOR 0
+
+/** \brief TCP port for the BMX160 sensor box
+ * 
+ */
+#define BMX_160_SENSOR_BOX_IP_PORT 19463
 
 /** \brief IP Address of the sensor box
  *
@@ -42,11 +49,6 @@
  * Before use you must define a Macro MAKE_IP_ADDR which takes the 4 octets as parameters
  */
 #define MAKE_IP_PEER_ADDR_I2C_BRIDGE MAKE_IP_ADDR(192,168,203,1)
-
-/** \brief TCP port of the binary interface of the sensor box
- *
- */
-#define BMX_160_SENSOR_BOX_IP_PORT 19463
 
 /*!
  * @brief bmm150 trim data structure
@@ -132,11 +134,25 @@ enum BMX160DataUnion {
  */
 struct BMX160Data {
 	struct  {
+	/// \see enum BMX160DataUnion
 	uint8_t unionCode;
+	/** \brief Three-byte timestamp from the sensor itself
+	 *
+	 * Each timer tick is 39usec.
+	 * Note that the counter wraps around every 10:54 minutes
+	 */
 	uint8_t sensorTime0;
 	uint8_t sensorTime1;
 	uint8_t sensorTime2;
+	uint8_t versionMajor;
+	uint8_t versionMinor;
 	uint16_t length;
+	/** Use the CRC-16-CCITT
+	 *
+	 * \see [Wikipedia](https://en.wikipedia.org/wiki/Cyclic_redundancy_check#Implementations): CRC-16-CCITT
+	 * \see [CRC-16 CCIT](http://http://reveng.sourceforge.net/crc-catalogue/all.htm#crc.cat.crc-16-ibm-3740)
+	 */
+	uint16_t crc;
 	} header;
 	union {
 		struct bmm150_trim_registers trimData;
@@ -166,6 +182,14 @@ struct BMX160RecvData {
 		uint8_t unionCode;
 		uint8_t filler;
 		uint16_t length;
+		uint8_t versionMajor;
+		uint8_t versionMinor;
+		/** Use the CRC-16-CCITT
+		 *
+		 * \see [Wikipedia](https://en.wikipedia.org/wiki/Cyclic_redundancy_check#Implementations): CRC-16-CCITT
+		 * \see [CRC-16 CCIT](http://http://reveng.sourceforge.net/crc-catalogue/all.htm#crc.cat.crc-16-ibm-3740)
+		 */
+		uint16_t crc;
 		} header;
 	union {
 		uint8_t dummy;
