@@ -271,7 +271,7 @@ void pppAppInit() {
     DEBUG_OUT_START_MSG();
     DEBUG_OUT("call pppos_create");
     DEBUG_OUT_END_MSG();
-	vTaskDelay(pdMS_TO_TICKS(200));
+	vTaskDelay(200/portTICK_PERIOD_MS);
 
 	memset (&ppp_netif,0,sizeof(ppp_netif));
 
@@ -298,7 +298,7 @@ void pppAppInit() {
     DEBUG_OUT_START_MSG();
     DEBUG_OUT("ppp_set_ipcp_ouraddr");
     DEBUG_OUT_END_MSG();
-	vTaskDelay(pdMS_TO_TICKS(200));
+	vTaskDelay(200/portTICK_PERIOD_MS);
 	ppp_set_ipcp_ouraddr(ppp, &addr);
 
 	/* Set peer(his) address */
@@ -307,7 +307,7 @@ void pppAppInit() {
     DEBUG_OUT_START_MSG();
     DEBUG_OUT("ppp_set_ipcp_hisaddr");
     DEBUG_OUT_END_MSG();
-	vTaskDelay(pdMS_TO_TICKS(200));
+	vTaskDelay(200/portTICK_PERIOD_MS);
 	ppp_set_ipcp_hisaddr(ppp, &addr);
 	/**/
 
@@ -335,21 +335,21 @@ void pppAppInit() {
     DEBUG_OUT_START_MSG();
     DEBUG_OUT("ppp_set_notify_phase_callback");
     DEBUG_OUT_END_MSG();
-	vTaskDelay(pdMS_TO_TICKS(200));
+	vTaskDelay(200/portTICK_PERIOD_MS);
 	ppp_set_notify_phase_callback(ppp, ppp_notify_phase_cb);
 
 	// Setup the serial port.
     DEBUG_OUT_START_MSG();
     DEBUG_OUT("PPPUsartInit");
     DEBUG_OUT_END_MSG();
-	vTaskDelay(pdMS_TO_TICKS(200));
+	vTaskDelay(200/portTICK_PERIOD_MS);
 	PPPUsartInit();
 
 	// ... and startup the receiver
     DEBUG_OUT_START_MSG();
     DEBUG_OUT("PPPUsartStart");
     DEBUG_OUT_END_MSG();
-	vTaskDelay(pdMS_TO_TICKS(200));
+	vTaskDelay(200/portTICK_PERIOD_MS);
 	PPPUsartStart(ppp);
 
 	/*
@@ -364,7 +364,7 @@ void pppAppInit() {
     DEBUG_OUT_START_MSG();
     DEBUG_OUT("ppp_set_passive");
     DEBUG_OUT_END_MSG();
-	vTaskDelay(pdMS_TO_TICKS(200));
+	vTaskDelay(200/portTICK_PERIOD_MS);
 	ppp_set_passive(ppp, 1);
 
 	ppp_set_default(ppp);
@@ -376,7 +376,7 @@ void pppAppInit() {
     DEBUG_OUT_START_MSG();
     DEBUG_OUT("ppp_listen");
     DEBUG_OUT_END_MSG();
-	vTaskDelay(pdMS_TO_TICKS(200));
+	vTaskDelay(200/portTICK_PERIOD_MS);
 	ppp_listen(ppp);
 }
 

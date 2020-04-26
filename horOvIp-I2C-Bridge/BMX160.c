@@ -99,12 +99,12 @@ static void readMagRegisters(uint8_t *buf,uint8_t reg,uint8_t len) {
 	dataBuf[0] = BMX160_MAG_IF_CONF_REG;
 	dataBuf[1] = (1<<BMX160_MAG_IF_MAG_MAN_EN_BIT) | ((lenCode & BMX160_MAG_IF_MAG_READ_BURST_LEN_MASK) << BMX160_MAG_IF_MAG_READ_BURST_LEN_LWB);
 	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
-	vTaskDelay(pdMS_TO_TICKS(10));
+	vTaskDelay(10/portTICK_PERIOD_MS);
 
 	dataBuf[0] = BMX160_MAG_IF_READ_ADDR_REG;
 	dataBuf[1] = reg;
 	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
-	vTaskDelay(pdMS_TO_TICKS(10));
+	vTaskDelay(10/portTICK_PERIOD_MS);
 
 	// Wait for the transfer to finish
 	wait_mag_man_op_finished();
@@ -147,7 +147,7 @@ static void powerAllSensorsOn() {
 		dataBuf[0] = BMX160_CMD_REG;
 		dataBuf[1] = BMX160_CMD_SET_ACC_PMU_MODE(BMX160_PMU_STATUS_ACC_NORMAL);
 		I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
-		vTaskDelay(pdMS_TO_TICKS(BMX160_CMD_SET_ACC_PMU_MODE_WAIT_TIME));
+		vTaskDelay(BMX160_CMD_SET_ACC_PMU_MODE_WAIT_TIME/portTICK_PERIOD_MS);
 
 		// read out the error register
 		dataBuf[0] = BMX160_ERR_REG;
@@ -168,7 +168,7 @@ static void powerAllSensorsOn() {
 		dataBuf[0] = BMX160_CMD_REG;
 		dataBuf[1] = BMX160_CMD_SET_GYR_PMU_MODE(BMX160_PMU_STATUS_GYR_NORMAL);
 		I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
-		vTaskDelay(pdMS_TO_TICKS(BMX160_CMD_SET_GYR_PMU_MODE_WAIT_TIME));
+		vTaskDelay(BMX160_CMD_SET_GYR_PMU_MODE_WAIT_TIME/portTICK_PERIOD_MS);
 
 		// read out the error register
 		dataBuf[0] = BMX160_ERR_REG;
@@ -190,7 +190,7 @@ static void powerAllSensorsOn() {
 		dataBuf[0] = BMX160_CMD_REG;
 		dataBuf[1] = BMX160_CMD_SET_MAG_PMU_MODE(BMX160_PMU_STATUS_MAG_IF_NORMAL);
 		I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
-		vTaskDelay(pdMS_TO_TICKS(BMX160_CMD_SET_MAG_IF_PMU_MODE_WAIT_TIME));
+		vTaskDelay(BMX160_CMD_SET_MAG_IF_PMU_MODE_WAIT_TIME/portTICK_PERIOD_MS);
 
 		// read out the error register
 		dataBuf[0] = BMX160_ERR_REG;
@@ -218,12 +218,12 @@ static void configAccel() {
 	// No undersampling | (BMX160_ACC_US_ENABLE << BMX160_ACC_US_BIT)
 	;
 	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
-	vTaskDelay(pdMS_TO_TICKS(10));
+	vTaskDelay(10/portTICK_PERIOD_MS);
 
 	dataBuf[0] = BMX160_ACC_RANGE_REG;
 	dataBuf[1] = BMX160_ACC_RANGE_4G;
 	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
-	vTaskDelay(pdMS_TO_TICKS(10));
+	vTaskDelay(10/portTICK_PERIOD_MS);
 
 }
 
@@ -235,12 +235,12 @@ static void configGyro() {
 	| (BMX160_GYR_BWP_NORMAL << BMX160_GYR_BWP_LWB)
 	;
 	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
-	vTaskDelay(pdMS_TO_TICKS(10));
+	vTaskDelay(10/portTICK_PERIOD_MS);
 
 	dataBuf[0] = BMX160_GYR_RANGE_REG;
 	dataBuf[1] = BMX160_GYR_RANGE_250_D_S;
 	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
-	vTaskDelay(pdMS_TO_TICKS(10));
+	vTaskDelay(10/portTICK_PERIOD_MS);
 
 }
 
@@ -253,86 +253,86 @@ static void configMag () {
 		// | ((readOffset&BMX160_MAG_IF_MAG_TRIG_READ_OFFS_MASK) << BMX160_MAG_IF_MAG_TRIG_READ_OFFS_LWB)
 		;
 	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
-	vTaskDelay(pdMS_TO_TICKS(10));
+	vTaskDelay(10/portTICK_PERIOD_MS);
 
 	// Mag mode 
 	dataBuf[0] = BMX160_MAG_IF_WRITE_DATA_REG;
 	dataBuf[1] = 0x01;
 	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
-	vTaskDelay(pdMS_TO_TICKS(10));
+	vTaskDelay(10/portTICK_PERIOD_MS);
 
 	// ... to sleep mode
 	dataBuf[0] = BMX160_MAG_IF_WRITE_ADDR_REG;
 	dataBuf[1] = 0x4b;
 	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
-	vTaskDelay(pdMS_TO_TICKS(10));
+	vTaskDelay(10/portTICK_PERIOD_MS);
 	wait_mag_man_op_finished();
-	vTaskDelay(pdMS_TO_TICKS(10));
+	vTaskDelay(10/portTICK_PERIOD_MS);
 
 	// Mag REPXY preset 
 	dataBuf[0] = BMX160_MAG_IF_WRITE_DATA_REG;
 	dataBuf[1] = 0x04;
 	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
-	vTaskDelay(pdMS_TO_TICKS(10));
+	vTaskDelay(10/portTICK_PERIOD_MS);
 	
 	// ... to normal
 	dataBuf[0] = BMX160_MAG_IF_WRITE_ADDR_REG;
 	dataBuf[1] = 0x51;
 	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
-	vTaskDelay(pdMS_TO_TICKS(10));
+	vTaskDelay(10/portTICK_PERIOD_MS);
 	wait_mag_man_op_finished();
 	
 	// Mag REPZ preset
 	dataBuf[0] = BMX160_MAG_IF_WRITE_DATA_REG;
 	dataBuf[1] = 0x0e;
 	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
-	vTaskDelay(pdMS_TO_TICKS(10));
+	vTaskDelay(10/portTICK_PERIOD_MS);
 	
 	// ... to normal
 	dataBuf[0] = BMX160_MAG_IF_WRITE_ADDR_REG;
 	dataBuf[1] = 0x52;
 	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
-	vTaskDelay(pdMS_TO_TICKS(10));
+	vTaskDelay(10/portTICK_PERIOD_MS);
 	wait_mag_man_op_finished();
 	
 	// prepare mag_if for data mode part 1
 	dataBuf[0] = BMX160_MAG_IF_WRITE_DATA_REG;
 	dataBuf[1] = 0x02;
 	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
-	vTaskDelay(pdMS_TO_TICKS(10));
+	vTaskDelay(10/portTICK_PERIOD_MS);
 	
 	// prepare mag_if for data mode part 2
 	dataBuf[0] = BMX160_MAG_IF_WRITE_ADDR_REG;
 	dataBuf[1] = 0x4c;
 	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
-	vTaskDelay(pdMS_TO_TICKS(10));
+	vTaskDelay(10/portTICK_PERIOD_MS);
 	wait_mag_man_op_finished();
 	
 	// prepare mag_if for data mode part 3
 	dataBuf[0] = BMX160_MAG_IF_READ_ADDR_REG;
 	dataBuf[1] = 0x42;
 	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
-	vTaskDelay(pdMS_TO_TICKS(10));
+	vTaskDelay(10/portTICK_PERIOD_MS);
 	wait_mag_man_op_finished();
 
     // Data rate to 50 Hz	
 	dataBuf[0] = BMX160_MAG_IF_ODR_REG;
 	dataBuf[1] = BMX160_MAG_IF_ODR;
 	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
-	vTaskDelay(pdMS_TO_TICKS(10));
+	vTaskDelay(10/portTICK_PERIOD_MS);
 	
 	// Set the mag_if to data mode
 	dataBuf[0] = BMX160_MAG_IF_CONF_REG;
 	dataBuf[1] = 0;
 	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
-	vTaskDelay(pdMS_TO_TICKS(10));
+	vTaskDelay(10/portTICK_PERIOD_MS);
 	
 
 	// Set mag_if to low-power mode
 	dataBuf[0] = BMX160_CMD_REG;
 	dataBuf[1] = BMX160_CMD_SET_MAG_PMU_MODE(BMX160_PMU_STATUS_MAG_IF_LOW_PWR);
 	I2CTransferSend(BMX160ADDR,dataBuf,2,NULL,NULL);
-	vTaskDelay(pdMS_TO_TICKS(BMX160_CMD_SET_MAG_IF_PMU_MODE_WAIT_TIME));
+	vTaskDelay(BMX160_CMD_SET_MAG_IF_PMU_MODE_WAIT_TIME/portTICK_PERIOD_MS);
 	
 }
 
@@ -511,7 +511,7 @@ void BMX160Init() {
 	powerAllSensorsOn();
 
 	// Let the mag sensor get into the swing
-	vTaskDelay(pdMS_TO_TICKS(200));
+	vTaskDelay(200/portTICK_PERIOD_MS);
 
 	readTrimRegistersRawValues();
 
@@ -519,7 +519,7 @@ void BMX160Init() {
 	configGyro();
 	configMag();
 
-	vTaskDelay(pdMS_TO_TICKS(200));
+	vTaskDelay(200/portTICK_PERIOD_MS);
 	BMX160ReadoutSensors();
 }
 
@@ -552,6 +552,9 @@ void BMX160ReadTrimRegisters()
 	bmx160Data.header.sensorTime0 = 0;
 	bmx160Data.header.sensorTime1 = 0;
 	bmx160Data.header.sensorTime2 = 0;
+	bmx160Data.header.crc = 0XFFFF;
+	bmx160Data.header.versionMajor = BMX160_SENSORBOX_MSG_VERSION_MAJOR;
+	bmx160Data.header.versionMinor = BMX160_SENSORBOX_MSG_VERSION_MINOR;
 	bmx160Data.header.length = sizeof(bmx160Data.header) + sizeof(bmx160Data.trimData);
 
 }
@@ -603,6 +606,12 @@ void BMX160ReadoutSensors() {
 			// Read only gyro and accel.
 			readSensorDataWithoutMag();
 		}
+
+		// Fill the constant header data.
+		bmx160Data.header.crc = 0XFFFF;
+		bmx160Data.header.versionMajor = BMX160_SENSORBOX_MSG_VERSION_MAJOR;
+		bmx160Data.header.versionMinor = BMX160_SENSORBOX_MSG_VERSION_MINOR;
+
 	}
 }
 

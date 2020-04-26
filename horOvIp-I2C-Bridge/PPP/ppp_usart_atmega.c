@@ -343,7 +343,7 @@ TPPPBufferIndex lNumInWriteBuffer;
 			if (waitingWriteTask) {
 				// Wait for the write ISR to empty the buffer
 				// Or just try again after 100ms.
-				ulTaskNotifyTake(pdTRUE,pdMS_TO_TICKS(1000));
+				ulTaskNotifyTake(pdTRUE,1000/portTICK_PERIOD_MS);
 			}
 
 		}
@@ -367,7 +367,7 @@ static void readerTaskFunc(void* ctx) {
 
 
 	for (;;) {
-		uint32_t taskNotifyRC = ulTaskNotifyTake(pdFALSE,pdMS_TO_TICKS(300));
+		uint32_t taskNotifyRC = ulTaskNotifyTake(pdFALSE,300/portTICK_PERIOD_MS);
 
 		TPPPBufferIndex readBlockLen;
 		portENTER_CRITICAL();
