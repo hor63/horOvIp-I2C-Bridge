@@ -174,7 +174,7 @@ static uint32_t getSysClocks() {
 
 static void vStatisticsTimerFunction( TimerHandle_t xTimer ) {
 
-	return;
+	//return;
 
 	vPortGetHeapStats(&heapStats);
 
