@@ -35,7 +35,7 @@
  * Buffer size for the PPP receive and send buffers
  *
  */
-#define PPP_BUFFER_SIZE 512
+#define PPP_BUFFER_SIZE 256
 
 /** 
  * Baud rate for the PPP serial connection.
@@ -85,6 +85,6 @@
  */
 #define TASK_PRIO_DRIVERS	5
 
-#define configMINIMAL_STACK_SIZE	( ( unsigned short ) 400 )
+#define configMINIMAL_STACK_SIZE	( ( unsigned short ) 200 )
 
 #endif /* CONFIG_H_ */
