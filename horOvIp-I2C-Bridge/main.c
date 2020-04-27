@@ -447,9 +447,9 @@ static void tcpMainLoop(){
 				lastTick = xTaskGetTickCount();
 				bytesWritten = 0;
 				err = netconn_write_partly((struct netconn *)connectedConn,bmx160Data,bmx160Data->header.length,NETCONN_COPY,&bytesWritten);
-				DEBUG_OUT("bytesWritten = ");
-				DEBUG_UINT_OUT((unsigned int)bytesWritten);
-				DEBUG_OUT("\r\n");
+				//DEBUG_OUT("bytesWritten = ");
+				//DEBUG_UINT_OUT((unsigned int)bytesWritten);
+				//DEBUG_OUT("\r\n");
 
 			}
 
