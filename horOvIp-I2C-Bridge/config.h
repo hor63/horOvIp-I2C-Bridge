@@ -85,6 +85,6 @@
  */
 #define TASK_PRIO_DRIVERS	5
 
-#define configMINIMAL_STACK_SIZE	( ( unsigned short ) 200 )
+#define configMINIMAL_STACK_SIZE	( ( unsigned short ) 400 )
 
 #endif /* CONFIG_H_ */
