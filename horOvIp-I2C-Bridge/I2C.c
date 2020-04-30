@@ -217,6 +217,15 @@ static enum I2CStatus errSeqStatus = STAT_IDLE;
 /// Callback to the initiator of one of the I2CStartTransfer... calls with the result of the transfer
 static I2CTransferFinishedCallbPtr transferFinishedCallback = NULL;
 
+void I2CInit() {
+
+	// Set data rate.
+	TWBR = (uint8_t)(TWI_BIT_RATE_REG_VAL);
+	// Set the prescaler to 0
+	TWSR &= ~(_BV(TWPS1) | _BV(TWPS0));
+
+}
+
 void I2CStartTransferSend (
 		uint8_t slAddr,
 		uint8_t *data,

@@ -34,7 +34,13 @@ enum I2CStatus {
 	STAT_STOP_SENT
 };
 
-/** Pointer to a callback function of the user
+/** \brief Initialize the I2C module
+ *
+ * Essentially set the prescaler to 0 and set the data rate to 100kHz
+ */
+void I2CInit();
+
+/** \brief Pointer to a callback function of the user
  *
  * @param transferResult The the final result of a transfer
  * @param i2cHWStatusCode The status code of the I2C hardware when transferResult is not I2C_RC_OK.
