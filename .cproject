@@ -24,7 +24,7 @@
 							<option id="mcu.toolchain.gnu.option.path.2133494239" name="Path" superClass="mcu.toolchain.gnu.option.path" value="C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\avr8\avr8-gnu-toolchain\bin" valueType="string"/>
 							<option id="mcu.toolchain.gnu.option.prefix.1090293047" name="Prefix" superClass="mcu.toolchain.gnu.option.prefix" value="avr-" valueType="string"/>
 							<targetPlatform archList="avr,msp430,i386,x86-64" binaryParser="org.eclipse.cdt.core.ELF" id="mcu.target.elf.1501627752" isAbstract="false" name="Supported microcontrollers" osList="avr,msp430,i386,x86-64" superClass="mcu.target.elf"/>
-							<builder buildPath="${workspace_loc:/horOvIp-I2C-Bridge/horOvIp-I2C-Bridge/Debug}" id="cdt.managedbuild.builder.gnu.cross.599254018" keepEnvironmentInBuildfile="false" managedBuildOn="false" name="Gnu Make Builder" superClass="cdt.managedbuild.builder.gnu.cross"/>
+							<builder buildPath="${workspace_loc:/horOvIp-I2C-Bridge/horOvIp-I2C-Bridge/Debug}" command="make" id="cdt.managedbuild.builder.gnu.cross.599254018" keepEnvironmentInBuildfile="false" managedBuildOn="false" name="Gnu Make Builder" superClass="cdt.managedbuild.builder.gnu.cross"/>
 							<tool id="mcu.tool.gnu.objcopy.1777624769" name="Object copy" superClass="mcu.tool.gnu.objcopy"/>
 							<tool id="mcu.tool.gnu.archiver.107317600" name="Archiver" superClass="mcu.tool.gnu.archiver"/>
 							<tool id="mcu.tool.gnu.c.linker.1023851322" name="C Linker" superClass="mcu.tool.gnu.c.linker">
