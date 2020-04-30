@@ -135,7 +135,7 @@ void debugOutUIntHex(unsigned int val) {
 
 void uip_log(char *msg) {
 	debugOutStr(msg);
-	debugOutChr('\n');
+	debugOutStr("\r\n");
 
 }
 

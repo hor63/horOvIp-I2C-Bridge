@@ -87,7 +87,7 @@ enum I2CStatus errSeqStatus;
 		DEBUG_UINT_OUT(HWStatus);
 		DEBUG_OUT (", Status diagram position = ");
 		DEBUG_UINT_OUT(errSeqStatus);
-		DEBUG_CHR_OUT('\n');
+		DEBUG_OUT("\r\n");
 		return false;
 	}
 
@@ -172,7 +172,7 @@ static void resetSensor() {
 	DEBUG_OUT ("Soft reset");
 	DEBUG_OUT (". Last error code = ");
 	DEBUG_UINT_HEX_OUT(dataBuf[0]);
-	DEBUG_CHR_OUT('\n');
+	DEBUG_OUT("\r\n");
 
 }
 
@@ -199,7 +199,7 @@ static void powerAllSensorsOn() {
 	DEBUG_OUT ("Accel");
 	DEBUG_OUT (" up. Last error code = ");
 	DEBUG_UINT_HEX_OUT(dataBuf[0]);
-	DEBUG_CHR_OUT('\n');
+	DEBUG_OUT("\r\n");
 	
 	// Switch on the gyro
 	do {
@@ -222,7 +222,7 @@ static void powerAllSensorsOn() {
 	DEBUG_OUT ("Gyro");
 	DEBUG_OUT (" up. Last error code = ");
 	DEBUG_UINT_HEX_OUT(dataBuf[0]);
-	DEBUG_CHR_OUT('\n');
+	DEBUG_OUT("\r\n");
 	
 	// Sequence see BMX160 datasheet V1.2, section 2.4.3.1.3, pg. 25
 	// Switch on the magnetometer interface
@@ -246,7 +246,7 @@ static void powerAllSensorsOn() {
 	DEBUG_OUT ("Mag interface");
 	DEBUG_OUT (" up. Last error code = ");
 	DEBUG_UINT_HEX_OUT(dataBuf[0]);
-	DEBUG_CHR_OUT('\n');
+	DEBUG_OUT("\r\n");
 		
 
 }
@@ -459,7 +459,7 @@ static void readSensorDataWOMagCallb (
 	DEBUG_INT_OUT(bmx160Data.accGyrData.accX);
 	DEBUG_OUT(", GyrX = ");
 	DEBUG_INT_OUT(bmx160Data.accGyrData.gyrX);
-	DEBUG_CHR_OUT('\n');
+	DEBUG_OUT("\r\n");
 */
 
 }
@@ -501,7 +501,7 @@ static void readSensorDataWithMagCallb (
 	DEBUG_INT_OUT(bmx160Data.accGyrMagData.gyrX);
 	DEBUG_OUT(", MagX = ");
 	DEBUG_INT_OUT(bmx160Data.accGyrMagData.magX);
-	DEBUG_CHR_OUT('\n');
+	DEBUG_OUT("\r\n");
 */
 }
 
@@ -525,7 +525,7 @@ static void readStatusRegForSensorDataCallb (
 /*
 			DEBUG_OUT("New data present. Number status reads = ");
 			DEBUG_UINT_OUT(numReadStatus);
-			DEBUG_CHR_OUT('\n');
+			DEBUG_OUT("\r\n");
 */
 			numReadStatus = 1;
 

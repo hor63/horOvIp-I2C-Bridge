@@ -126,7 +126,7 @@ int main(void) {
 	set_sleep_mode(0);
 	
 	DEBUG_INIT();
-	DEBUG_OUT("\n\nhorOV IMU board V0.1\n");
+	DEBUG_OUT("\r\n\r\nhorOV IMU board V0.1\r\n");
 	
 	uip_init();
 
@@ -148,6 +148,8 @@ int main(void) {
 
 	// Start interrupts here
 	sei();
+
+	I2CInit();
 
 	// Let other components start up safely, particularly the IMU but also other sensors
 	_delay_ms(1000);
@@ -173,7 +175,7 @@ int main(void) {
 	uipTimerCallChainItem.next = NULL;
 	timerAddCallback(&uipTimerCallChainItem);
 
-	DEBUG_OUT("STARTUP done\n");
+	DEBUG_OUT("STARTUP done\r\n");
 
 
     while (1) {

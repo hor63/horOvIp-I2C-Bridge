@@ -389,7 +389,7 @@ void slipProcessReadBuffer() {
 /*
 		DEBUG_OUT("Received segment, len= ");
 		DEBUG_UINT_OUT(currSegment->header.dataLen);
-		DEBUG_CHR_OUT('\n');
+		DEBUG_OUT("\r\n");
 */
 		memcpy(uip_buf,currSegment->data,currSegment->header.dataLen);
 			
@@ -541,7 +541,7 @@ ISR(USART0_RX_vect) {
 				// Stop flushing when an END character is received.
 				recvFlushMsg = false;
 				mainLoopMustRun = true;
-				DEBUG_OUT("Leave flush mode.\n");
+				DEBUG_OUT("Leave flush mode.\r\n");
 			}
 		} else { // if (recvFlushMsg )
 			// Normal receive mode
@@ -551,9 +551,9 @@ ISR(USART0_RX_vect) {
 				|| (statusRegA & (_BV(FE0)|_BV(DOR0)|_BV(UPE0))) // Framing Error, buffer overrun, parity error
 				) {
 				if (!recvCurrSegment) {
-					DEBUG_OUT("Flush Mode because no recv segment present.\n");
+					DEBUG_OUT("Flush Mode because no recv segment present.\r\n");
 				} else {
-					DEBUG_OUT("Flush Mode Ser hardware error.\n");
+					DEBUG_OUT("Flush Mode Ser hardware error.\r\n");
 				}
 				enterFlushMode();	
 			} else { // Various error conditions
@@ -608,7 +608,7 @@ ISR(USART0_RX_vect) {
 								default:
 									// Something went wrong here.
 									enterFlushMode();
-									DEBUG_OUT ("Flush mode: Illegal masked character.\n");
+									DEBUG_OUT ("Flush mode: Illegal masked character.\r\n");
 									goto nextCharFromFiFO;
 							} // switch (recvChar)
 						} // if (recvEscReceived)
@@ -616,7 +616,7 @@ ISR(USART0_RX_vect) {
 						// Check if the cursor is over the limit (it was incremented which the previous received byte.
 						if (recvSegmentCursor >= IP_BUFFER_SIZE) {
 							enterFlushMode();
-							DEBUG_OUT ("Flush mode: Received segment too long.\n");
+							DEBUG_OUT ("Flush mode: Received segment too long.\r\n");
 							goto nextCharFromFiFO;
 						}
 						
