@@ -20,7 +20,7 @@
 							<option id="cdt.managedbuild.option.gnu.cross.prefix.233802645" name="Prefix" superClass="cdt.managedbuild.option.gnu.cross.prefix" value="avr-" valueType="string"/>
 							<option id="cdt.managedbuild.option.gnu.cross.path.1893231068" name="Path" superClass="cdt.managedbuild.option.gnu.cross.path" value="C:\Programs\AtmelStudio\toolchain\avr8\avr8-gnu-toolchain\bin" valueType="string"/>
 							<targetPlatform archList="all" binaryParser="org.eclipse.cdt.core.ELF" id="cdt.managedbuild.targetPlatform.gnu.cross.1898125216" isAbstract="false" osList="all" superClass="cdt.managedbuild.targetPlatform.gnu.cross"/>
-							<builder buildPath="${workspace_loc:/horOvIp-I2C-Bridge}/Debug" command="make" id="cdt.managedbuild.builder.gnu.cross.378748009" keepEnvironmentInBuildfile="false" managedBuildOn="false" name="Gnu Make Builder" superClass="cdt.managedbuild.builder.gnu.cross"/>
+							<builder buildPath="${workspace_loc:/horOvIp-I2C-Bridge-FreeRTOS/Debug}" command="make" id="cdt.managedbuild.builder.gnu.cross.378748009" keepEnvironmentInBuildfile="false" managedBuildOn="false" name="Gnu Make Builder" superClass="cdt.managedbuild.builder.gnu.cross"/>
 							<tool id="cdt.managedbuild.tool.gnu.cross.c.compiler.1316554339" name="Cross GCC Compiler" superClass="cdt.managedbuild.tool.gnu.cross.c.compiler">
 								<option defaultValue="gnu.c.optimization.level.none" id="gnu.c.compiler.option.optimization.level.1298396579" name="Optimization Level" superClass="gnu.c.compiler.option.optimization.level" useByScannerDiscovery="false" valueType="enumerated"/>
 								<option defaultValue="gnu.c.debugging.level.max" id="gnu.c.compiler.option.debugging.level.338690320" name="Debug Level" superClass="gnu.c.compiler.option.debugging.level" useByScannerDiscovery="false" valueType="enumerated"/>
@@ -99,7 +99,7 @@
 		</cconfiguration>
 	</storageModule>
 	<storageModule moduleId="cdtBuildSystem" version="4.0.0">
-		<project id="horOvIp-I2C-Bridge.cdt.managedbuild.target.gnu.cross.exe.827020462" name="Executable" projectType="cdt.managedbuild.target.gnu.cross.exe"/>
+		<project id="horOvIp-I2C-Bridge-FreeRTOS.cdt.managedbuild.target.gnu.cross.exe.827020462" name="Executable" projectType="cdt.managedbuild.target.gnu.cross.exe"/>
 	</storageModule>
 	<storageModule moduleId="scannerConfiguration">
 		<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
@@ -113,10 +113,10 @@
 	<storageModule moduleId="org.eclipse.cdt.core.LanguageSettingsProviders"/>
 	<storageModule moduleId="refreshScope" versionNumber="2">
 		<configuration configurationName="Debug">
-			<resource resourceType="PROJECT" workspacePath="/horOvIp-I2C-Bridge"/>
+			<resource resourceType="PROJECT" workspacePath="/horOvIp-I2C-Bridge-FreeRTOS"/>
 		</configuration>
 		<configuration configurationName="Release">
-			<resource resourceType="PROJECT" workspacePath="/horOvIp-I2C-Bridge"/>
+			<resource resourceType="PROJECT" workspacePath="/horOvIp-I2C-Bridge-FreeRTOS"/>
 		</configuration>
 	</storageModule>
 	<storageModule moduleId="org.eclipse.cdt.make.core.buildtargets"/>
