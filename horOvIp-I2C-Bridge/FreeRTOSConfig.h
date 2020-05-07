@@ -75,7 +75,7 @@
 #define configTIMER_QUEUE_LENGTH	4
 #define configTIMER_TASK_STACK_DEPTH	configMINIMAL_STACK_SIZE
 
-#define configNUM_THREAD_LOCAL_STORAGE_POINTERS 2
+#define configNUM_THREAD_LOCAL_STORAGE_POINTERS 0
 
 #define configASSERT(x) \
 	do {if((x)==0) {debugAssertOut("Assert",__FILE__, __LINE__ );}} while (0)
