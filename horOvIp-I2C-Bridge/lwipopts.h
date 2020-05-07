@@ -40,7 +40,7 @@
 #define LWIP_NETCONN                    1
 #define LWIP_SOCKET                     1
 #define LWIP_TCP_KEEPALIVE              1
-#define LWIP_NETCONN_FULLDUPLEX         1
+#define LWIP_NETCONN_FULLDUPLEX         0
 #define LWIP_NETBUF_RECVINFO            1
 
 #define TCPIP_THREAD_STACKSIZE          configMINIMAL_STACK_SIZE*3
@@ -60,11 +60,16 @@
 #define LWIP_IPV6                       0
 #define LWIP_ARP                        0
 
+// Do not allow fragmentation. Not needed for the packet sizes used here.
+#define IP_REASSEMBLY                   0
+#define IP_FRAG                         0
+
+
 // #define LWIP_ASSERT_CORE_LOCKED
-#define LWIP_TCPIP_CORE_LOCKING         0
+#define LWIP_TCPIP_CORE_LOCKING         1
 #define LWIP_TCPIP_CORE_LOCKING_INPUT   0
 
-#define LWIP_NETCONN_SEM_PER_THREAD		1
+#define LWIP_NETCONN_SEM_PER_THREAD		0
 
 #define MEM_LIBC_MALLOC					1
 #define MEMP_MEM_MALLOC					1
