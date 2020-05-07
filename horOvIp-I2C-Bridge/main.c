@@ -58,7 +58,7 @@ int main(void) {
 	// Enable sleep here. The idle hook will sleep the processor
 	sleep_enable();
 
-	xTaskCreate( mainTask, "TCPMain", configMINIMAL_STACK_SIZE * 2, NULL, TASK_PRIO_APP, NULL );
+	xTaskCreate( mainTask, "TCPMain", configMINIMAL_STACK_SIZE * 3, NULL, TASK_PRIO_APP, NULL );
 	testTimer = xTimerCreate("Blinky",33,pdTRUE,vTestTimerFunction,vTestTimerFunction);
 	statisticsTimer = xTimerCreate("Statistics",5000/portTICK_PERIOD_MS,pdTRUE,vStatisticsTimerFunction,vStatisticsTimerFunction);
 	xTimerStart(testTimer,10);
@@ -340,10 +340,11 @@ void ip_i2c_bridge_appcall() {
 	*/
 }
 
-static SemaphoreHandle_t writeTaskSync = NULL;
-static SemaphoreHandle_t readTaskSync = NULL;
-static volatile struct netconn *connectedConn = NULL;
+// static SemaphoreHandle_t writeTaskSync = NULL;
+// static SemaphoreHandle_t readTaskSync = NULL;
+//static volatile struct netconn *connectedConn = NULL;
 
+/*
 static void tcpReadTask( void *pvParameters ) {
 	err_t err;
 
@@ -389,8 +390,9 @@ static void tcpReadTask( void *pvParameters ) {
 
 	}
 }
+*/
 
-
+static struct netconn *connectedConn = NULL;
 static void tcpMainLoop(){
 	struct netconn *listenConn;
 	err_t err;
@@ -398,22 +400,27 @@ static void tcpMainLoop(){
 	size_t bytesWritten;
 	struct BMX160Data* const bmx160Data = BMX160GetData();
 
-	writeTaskSync = xSemaphoreCreateBinary();
-	readTaskSync = xSemaphoreCreateBinary();
+	//writeTaskSync = xSemaphoreCreateBinary();
+	//readTaskSync = xSemaphoreCreateBinary();
 
-	// Create the per-thread semphor
+	// Create the per-thread semphor if configured
 	netconn_thread_init();
 
-	xTaskCreate( tcpReadTask, "TCPRead", configMINIMAL_STACK_SIZE * 2, NULL, TASK_PRIO_APP, NULL );
+	// xTaskCreate( tcpReadTask, "TCPRead", configMINIMAL_STACK_SIZE * 2, NULL, TASK_PRIO_APP, NULL );
 
 	for (;;) {
 		listenConn = netconn_new(NETCONN_TCP);
-		netconn_bind(listenConn, IP_ADDR_ANY, BMX_160_SENSOR_BOX_IP_PORT);
 
-		netconn_listen(listenConn);
+		err = netconn_bind(listenConn, IP_ADDR_ANY, BMX_160_SENSOR_BOX_IP_PORT);
+
+		if (err == ERR_OK) {
+			netconn_listen(listenConn);
+		}
 
 		connectedConn = NULL;
-	    err = netconn_accept(listenConn, (struct netconn **)&connectedConn);
+		if (err == ERR_OK) {
+		    err = netconn_accept(listenConn, (struct netconn **)&connectedConn);
+		}
 	    if (err == ERR_OK) {
 
 	    	netconn_close(listenConn);
@@ -421,9 +428,10 @@ static void tcpMainLoop(){
 	    	listenConn = NULL;
 
 	    	tcp_set_flags(connectedConn->pcb.tcp,TF_NODELAY);
+			netconn_set_nonblocking(connectedConn,1);
 
 	    	// Cut the read task loose.
-			xSemaphoreGive(readTaskSync);
+			//xSemaphoreGive(readTaskSync);
 
 			BMX160ReadTrimRegisters();
 			bytesWritten = 0;
@@ -434,7 +442,7 @@ static void tcpMainLoop(){
 					&bytesWritten);
 			lastTick = xTaskGetTickCount();
 
-			while (err == ERR_OK) {
+			while (err == ERR_OK || err == ERR_WOULDBLOCK) {
 				/* +/
 				DEBUG_OUT("TCP Sent ");
 				DEBUG_UINT_OUT(bmx160Data->header.length);
@@ -451,6 +459,16 @@ static void tcpMainLoop(){
 				//DEBUG_UINT_OUT((unsigned int)bytesWritten);
 				//DEBUG_OUT("\r\n");
 
+				if (err == ERR_OK || err == ERR_WOULDBLOCK) {
+					do {
+						struct netbuf* buf = NULL;
+						err = netconn_recv((struct netconn *)connectedConn,&buf);
+						if (buf) {
+							netbuf_delete(buf);
+						}
+					} while (err == ERR_OK);
+				}
+
 			}
 
 			/*
@@ -464,7 +482,7 @@ static void tcpMainLoop(){
 
 	    	// Closing the connection should also let the read task crash out of the receiving loop
 	    	// The read task will release the sema when it leaves its read loop due to the error caused by the
-			xSemaphoreTake(writeTaskSync,portMAX_DELAY);
+			// xSemaphoreTake(writeTaskSync,portMAX_DELAY);
 
 	    	netconn_delete((struct netconn *)connectedConn);
 	    	connectedConn = NULL;
