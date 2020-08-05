@@ -16,6 +16,7 @@
 #include "netif/ppp/pppos.h"
 #include "netif/ppp/pppapi.h"
 
+#include <PPP/PPPApp.h>
 #include "PPP/ppp_usart_atmega.h"
 #include "BMX160net.h"
 
@@ -26,8 +27,11 @@ static ppp_pcb *ppp;
 /* The PPP IP interface */
 static struct netif ppp_netif;
 
+static bool pppIsRunning = false;
 
 static void ppp_notify_phase_cb(ppp_pcb *pcb, u8_t phase, void *ctx) {
+  bool locPppIsRunning = false;
+
   switch (phase) {
 
   /* Session is down (either permanently or briefly) */
@@ -53,6 +57,8 @@ static void ppp_notify_phase_cb(ppp_pcb *pcb, u8_t phase, void *ctx) {
   /* Session is running */
   case PPP_PHASE_RUNNING:
      DEBUG_OUT("PPP phase RUNNING");
+     locPppIsRunning = true;
+
 //    led_set(PPP_LED, LED_ON);
     break;
 	
@@ -98,6 +104,8 @@ static void ppp_notify_phase_cb(ppp_pcb *pcb, u8_t phase, void *ctx) {
     break;
   }
   DEBUG_OUT_END_MSG();
+
+  pppIsRunning = locPppIsRunning;
 }
 
 /*
@@ -248,10 +256,10 @@ static void status_cb(ppp_pcb *pcb, int err_code, void *ctx) {
   }
 
   /*
-   * Try to reconnect in 30 seconds, if you need a modem chatscript you have
+   * Try to reconnect in 5 seconds, if you need a modem chatscript you have
    * to do a much better signaling here ;-)
    */
-  ppp_connect(pcb, 30);
+  ppp_connect(pcb, 5);
   /* OR ppp_listen(pcb); */
 }
 
@@ -380,3 +388,7 @@ void pppAppInit() {
 	ppp_listen(ppp);
 }
 
+
+bool isPPPRunning() {
+	return pppIsRunning;
+}

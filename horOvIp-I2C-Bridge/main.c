@@ -7,6 +7,7 @@
 
 #include "config.h"
 #include <stdint.h>
+#include <string.h>
 #include <avr/io.h>
 #include <avr/sleep.h>
 #include <avr/interrupt.h>
@@ -81,7 +82,7 @@ void tcpipInitDoneCb (void* d) {
 
 }
 
-static void tcpMainLoop();
+static void udpMainLoop();
 
 static void mainTask( void *pvParameters ) {
 
@@ -138,7 +139,7 @@ static void mainTask( void *pvParameters ) {
 	DEBUG_OUT("STARTUP done");
 	DEBUG_OUT_END_MSG();
 
-	tcpMainLoop();
+	udpMainLoop();
 
 	// Terminate yourself
 	vTaskDelete(NULL);
@@ -216,230 +217,134 @@ void vApplicationIdleHook( void ) {
 }
 
 
-/** \brief process an incoming message on the TCP connection
- *
- * Only messages of type \ref struct BMX160RecvData are being expected
- *
- * @param data Pointer to the receive data
- * @param len length of received data
- * @return true when the function put a message into the send buffer, i.e. the uip application callback must not send any other data.
- */
 
-static bool processTCPMessage(void const *data,size_t len) {
-	bool rc = false;
-	
-	/*
-	uip_appdata pointer. The size of the data is
-	* available through the uip_len
-	*/
-	struct BMX160RecvData const *recvData = (struct BMX160RecvData const *)data;
-	struct BMX160Data* bmxData;
-	
-	if (len == recvData->header.length) {
-		// Seems legit
-		switch (recvData->header.unionCode) {
-			case BMX160RECV_DATA_RESET_IMU:
-			
-				// Stop the periodic data capturing temporarily
-				BMX160StopDataCapturing();
+static ip4_addr_t ipAddrSendTo;
+static ip4_addr_t ipAddrOwn;
 
-				BMX160Init();
-				BMX160ReadTrimRegisters();
-				bmxData = BMX160GetData();				
-				
-				/** todo send answer
-				if (uip_mss() >= bmxData->header.length) {
-					uip_send (bmxData,bmxData->header.length);
-					rc = true;
-				}
-				*/
-				
-				// restart the data capture
-				BMX160StartDataCapturing();
-				
-				break;
-			
-			case BMX160RECV_DATA_RESEND_MAG_TRIM_DATA:
-
-				// Stop the periodic data capturing temporarily
-				BMX160StopDataCapturing();
-				
-				BMX160ReadTrimRegisters();
-				bmxData = BMX160GetData();
-				
-//				if (uip_mss() >= bmxData->header.length) {
-//					uip_send (bmxData,bmxData->header.length);
-					rc = true;
-//				}
-				
-				// restart the data capture
-				BMX160StartDataCapturing();
-			
-				break;
-			default:
-				break;
-		}
-	}
-	
-	return rc;
-}
-
-// todo Replace this callback with a task based code
-void ip_i2c_bridge_appcall() {
-	struct BMX160Data* bmx160Data = BMX160GetData();
-	bool sendBMXData = false;
+static volatile bool resendCalibrationData = false;
+static volatile bool resetIMU = false;
 
 
-	/** todo After accepting a new connection send the Mag trim data
-	if(uip_connected()) {
-		uip_conn->appstate.sensorTime0 = 0;
-		uip_conn->appstate.sensorTime1 = 0;
-		uip_conn->appstate.sensorTime2 = 0;
-
-		BMX160ReadTrimRegisters();
-		uip_send(bmx160Data,bmx160Data->header.length);
-		uip_conn->appstate.numSendPackagesPending = 1;
-
-		mainLoopMustRun = true;
-		return;
-	}
-	 */
-
-
-	/** todo Read and process incoming messages
-	if(uip_newdata()) {
-		if (processTCPMessage()) {
-			mainLoopMustRun = true;
-			return;
-		}
-	}
-	*/
-
-
-	/** todo Send BMX data when new ones become available.
-	if (BMX160IsDataValid() &&
-		bmx160Data->header.unionCode != BMX160DATA_TRIM && (
-			bmx160Data->header.sensorTime0 != uip_conn->appstate.sensorTime0 ||
-			bmx160Data->header.sensorTime1 != uip_conn->appstate.sensorTime1 ||
-			bmx160Data->header.sensorTime2 != uip_conn->appstate.sensorTime2
-			) &&
-			uip_mss() >= bmx160Data->header.length) {
-		sendBMXData = true;
-	}
-
-	if (sendBMXData) {
-		uip_conn->appstate.sensorTime0 = bmx160Data->header.sensorTime0;
-		uip_conn->appstate.sensorTime1 = bmx160Data->header.sensorTime1;
-		uip_conn->appstate.sensorTime2 = bmx160Data->header.sensorTime2;
-		uip_send(bmx160Data,bmx160Data->header.length);
-
-		uip_conn->appstate.numSendPackagesPending ++;
-		
-		mainLoopMustRun = true;
-	}
-	*/
-}
-
-// static SemaphoreHandle_t writeTaskSync = NULL;
-// static SemaphoreHandle_t readTaskSync = NULL;
-//static volatile struct netconn *connectedConn = NULL;
-
-/*
-static void tcpReadTask( void *pvParameters ) {
+static void udpRecvTask( void *pvParameters ) {
 	err_t err;
+	static struct netconn *recvUdpConn = NULL;
 
 	// Create the per-thread semphore
 	netconn_thread_init();
 
 	for (;;) {
 		struct netbuf *buf;
-		xSemaphoreTake(readTaskSync,portMAX_DELAY);
+		recvUdpConn = netconn_new(NETCONN_UDP);
 
-		// Now the connection is guaranteed to exist
 		err = ERR_OK;
-		buf = NULL;
-		while (err == ERR_OK && connectedConn != NULL){
-			err = netconn_recv((struct netconn *)connectedConn,&buf);
+
+		if (recvUdpConn != NULL) {
+			err = netconn_bind(recvUdpConn, &ipAddrOwn, BMX_160_SENSOR_BOX_IP_PORT);
+
+			if (err != ERR_OK) {
+				DEBUG_OUT("UDP recv bind, err =");
+				DEBUG_INT_OUT((int)err);
+				DEBUG_OUT("\r\n");
+			}
+		}
+
+		while (err == ERR_OK && recvUdpConn != NULL){
+			// Now the connection is guaranteed to exist
+			buf = NULL;
+			err = netconn_recv(recvUdpConn,&buf);
 			if (err == ERR_OK) {
-//				DEBUG_OUT("TCP recv");
 				if (buf != NULL) {
 					netbuf_first(buf);
 					do {
-						void* ptr;
+						void* ptr = NULL;
 						u16_t len = 0;
 						if (netbuf_data(buf,&ptr,&len) == ERR_OK) {
-//							DEBUG_OUT ("\r\n  len = ");
-//							DEBUG_UINT_OUT(len);
+							struct BMX160RecvData * recvData = (struct BMX160RecvData *)ptr;
+							DEBUG_OUT("UDP recv");
+							DEBUG_OUT ("\r\n  len = ");
+							DEBUG_UINT_OUT(len);
+							DEBUG_OUT ("\r\n");
+
+							if (len == sizeof(struct BMX160RecvData) &&
+									recvData->header.versionMajor == BMX160_SENSORBOX_MSG_VERSION_MAJOR &&
+									recvData->header.versionMinor == BMX160_SENSORBOX_MSG_VERSION_MINOR &&
+									recvData->header.crc == 0xffff) {
+								// looks legitimate
+								switch (recvData->header.unionCode) {
+								case BMX160RECV_DATA_RESET_IMU:
+									resetIMU = true;
+									break;
+								case BMX160RECV_DATA_RESEND_MAG_TRIM_DATA:
+									resendCalibrationData = true;
+									break;
+								default:
+									break;
+								}
+							}
 						}
 					} while (netbuf_next(buf) != -1);
 				}
-//				DEBUG_OUT ("\r\n");
 
+			} else {
+				DEBUG_OUT("UDP recv, err =");
+				DEBUG_INT_OUT((int)err);
+				DEBUG_OUT("\r\n");
 			}
+
 			if (buf != NULL) {
 				netbuf_delete(buf);
 			}
 		}
 
-		// Now the main thread waits for me to crash out.
-		xSemaphoreGive(writeTaskSync);
-
-		DEBUG_OUT("TCP recv, err =");
-		DEBUG_INT_OUT((int)err);
-		DEBUG_OUT("\r\n");
+		if (recvUdpConn != NULL) {
+			netconn_close(recvUdpConn);
+			netconn_delete(recvUdpConn);
+			recvUdpConn = NULL;
+		}
 
 	}
 }
-*/
 
-static struct netconn *connectedConn = NULL;
-static void tcpMainLoop(){
-	struct netconn *listenConn;
-	err_t err;
-	TickType_t lastTick;
-	size_t bytesWritten;
-	struct BMX160Data* const bmx160Data = BMX160GetData();
 
-	//writeTaskSync = xSemaphoreCreateBinary();
-	//readTaskSync = xSemaphoreCreateBinary();
+#define MAKE_IP_ADDR(a1,a2,a3,a4) PP_HTONL(LWIP_MAKEU32(a1,a2,a3,a4))
+
+static void udpMainLoop(){
+	static err_t err;
+	static TickType_t lastTick;
+	static struct BMX160Data* bmx160Data;
+	static struct netconn *udpSendConn;
+	static struct netbuf *netb;
+	static void *netBufData;
+
+	bmx160Data = BMX160GetData();
+
+	// writeTaskSync = xSemaphoreCreateBinary();
+	// readTaskSync = xSemaphoreCreateBinary();
+
+	ipAddrSendTo.addr = MAKE_IP_PEER_ADDR_I2C_BRIDGE;
+	ipAddrOwn.addr = MAKE_IP_ADDR_I2C_BRIDGE;
 
 	// Create the per-thread semphor if configured
 	netconn_thread_init();
 
-	// xTaskCreate( tcpReadTask, "TCPRead", configMINIMAL_STACK_SIZE * 2, NULL, TASK_PRIO_APP, NULL );
+	xTaskCreate( udpRecvTask, "UDPRecv", configMINIMAL_STACK_SIZE * 2, NULL, TASK_PRIO_APP, NULL );
 
 	for (;;) {
-		listenConn = netconn_new(NETCONN_TCP);
+		udpSendConn = netconn_new(NETCONN_UDP);
 
-		err = netconn_bind(listenConn, IP_ADDR_ANY, BMX_160_SENSOR_BOX_IP_PORT);
+		// This is solely a sending connection.
+		// Therefore I can assign a dynamic port (pass 0).
+		err = netconn_bind(udpSendConn, &ipAddrOwn, 0);
 
-		if (err == ERR_OK) {
-			netconn_listen(listenConn);
-		}
-
-		connectedConn = NULL;
-		if (err == ERR_OK) {
-		    err = netconn_accept(listenConn, (struct netconn **)&connectedConn);
-		}
 	    if (err == ERR_OK) {
 
-	    	netconn_close(listenConn);
-	    	netconn_delete(listenConn);
-	    	listenConn = NULL;
+			netconn_set_nonblocking(udpSendConn,1);
 
-	    	tcp_set_flags(connectedConn->pcb.tcp,TF_NODELAY);
-			netconn_set_nonblocking(connectedConn,1);
+			while (!isPPPRunning()) {
+				vTaskDelay(500/portTICK_PERIOD_MS);
+			}
 
-	    	// Cut the read task loose.
-			//xSemaphoreGive(readTaskSync);
 
-			BMX160ReadTrimRegisters();
-			bytesWritten = 0;
-			err = netconn_write_partly(
-					(struct netconn *)connectedConn,
-					bmx160Data,bmx160Data->header.length,
-					NETCONN_COPY | NETCONN_MORE,
-					&bytesWritten);
 			lastTick = xTaskGetTickCount();
 
 			while (err == ERR_OK || err == ERR_WOULDBLOCK) {
@@ -448,49 +353,64 @@ static void tcpMainLoop(){
 				DEBUG_UINT_OUT(bmx160Data->header.length);
 				DEBUG_OUT(" bytes\r\n");
 				/+ */
-				vTaskDelayUntil(&lastTick,15/portTICK_PERIOD_MS);
+				vTaskDelayUntil(&lastTick,20/portTICK_PERIOD_MS);
 
 				BMX160ReadoutSensors();
 				// I wait 15 ms from now, after data are actually valid.
 				lastTick = xTaskGetTickCount();
-				bytesWritten = 0;
-				err = netconn_write_partly((struct netconn *)connectedConn,bmx160Data,bmx160Data->header.length,NETCONN_COPY,&bytesWritten);
-				//DEBUG_OUT("bytesWritten = ");
-				//DEBUG_UINT_OUT((unsigned int)bytesWritten);
-				//DEBUG_OUT("\r\n");
+				if (isPPPRunning()) {
+					netb = netbuf_new();
+					netBufData = netbuf_alloc(netb,sizeof(struct BMX160Data));
+					memcpy(netBufData,bmx160Data,sizeof(struct BMX160Data));
+					netb->addr.addr = ipAddrSendTo.addr;
+					netb->port = BMX_160_SENSOR_BOX_IP_PORT;
+					err = netconn_send(udpSendConn,netb);
+					netbuf_delete(netb);
 
-				if (err == ERR_OK || err == ERR_WOULDBLOCK) {
-					do {
-						struct netbuf* buf = NULL;
-						err = netconn_recv((struct netconn *)connectedConn,&buf);
-						if (buf) {
-							netbuf_delete(buf);
+					if (err == ERR_OK) {
+						if (resetIMU) {
+							BMX160Init();
+
+							resetIMU = false;
+							resendCalibrationData = true;
 						}
-					} while (err == ERR_OK);
+						if (resendCalibrationData) {
+
+							BMX160ReadTrimRegisters();
+
+							netb = netbuf_new();
+							if (netb != NULL) {
+								netBufData = netbuf_alloc(netb,sizeof(struct BMX160Data));
+							}
+							if (netBufData) {
+								memcpy(netBufData,bmx160Data,sizeof(struct BMX160Data));
+								netb->addr.addr = ipAddrSendTo.addr;
+								netb->port = BMX_160_SENSOR_BOX_IP_PORT;
+								err = netconn_send(udpSendConn,netb);
+							}
+							if (netb != NULL) {
+								netbuf_delete(netb);
+							}
+							resendCalibrationData = false;
+						}
+
+					}
 				}
 
 			}
 
-			/*
-			DEBUG_OUT("TCP send, err =");
+			DEBUG_OUT("UDP send, err =");
 			DEBUG_INT_OUT((int)err);
 			DEBUG_OUT("\r\n");
-			*/
 
-			// Close the connection.
-	    	netconn_close((struct netconn *)connectedConn);
+	    	netconn_close(udpSendConn);
+	    	netconn_delete(udpSendConn);
 
-	    	// Closing the connection should also let the read task crash out of the receiving loop
-	    	// The read task will release the sema when it leaves its read loop due to the error caused by the
-			// xSemaphoreTake(writeTaskSync,portMAX_DELAY);
-
-	    	netconn_delete((struct netconn *)connectedConn);
-	    	connectedConn = NULL;
-
+	    	vTaskDelay(500/portTICK_PERIOD_MS);
 
 	    } else {
-	    	netconn_close(listenConn);
-	    	netconn_delete(listenConn);
+	    	netconn_close(udpSendConn);
+	    	netconn_delete(udpSendConn);
 
 	    	vTaskDelay(500/portTICK_PERIOD_MS);
 	    }

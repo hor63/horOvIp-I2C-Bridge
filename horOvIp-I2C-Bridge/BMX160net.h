@@ -15,7 +15,7 @@
 #include <inttypes.h>
 
 #define BMX160_SENSORBOX_MSG_VERSION_MAJOR 1
-#define BMX160_SENSORBOX_MSG_VERSION_MINOR 0
+#define BMX160_SENSORBOX_MSG_VERSION_MINOR 1
 
 /** \brief TCP port for the BMX160 sensor box
  * 
@@ -192,7 +192,7 @@ struct BMX160RecvData {
 		uint16_t crc;
 		} header;
 	union {
-		uint8_t dummy;
+		uint32_t dummy;
 		};
 	};
 
