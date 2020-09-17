@@ -49,11 +49,11 @@
 #define configUSE_IDLE_HOOK			1
 #define configUSE_TICK_HOOK			0
 #define configCPU_CLOCK_HZ			F_CPU
-#define configTICK_RATE_HZ			( ( TickType_t ) 200 )
+#define configTICK_RATE_HZ			( ( TickType_t ) 500 )
 #define configMAX_PRIORITIES		( 6 )
 // In config.h
 // #define configMINIMAL_STACK_SIZE	( ( unsigned short ) 400 )
-#define configTOTAL_HEAP_SIZE		( (size_t ) (  10500 ) )
+#define configTOTAL_HEAP_SIZE		( (size_t ) (  10000 ) )
 #define configMAX_TASK_NAME_LEN		( 16 )
 #define configUSE_16_BIT_TICKS		0
 #define configIDLE_SHOULD_YIELD		0
