@@ -608,6 +608,9 @@ ISR(TWI_vect){
 
 		}
 
+		// Flush out all registers to memory.
+		_MemoryBarrier();
+
 #if configUSE_PREEMPTION
 	if (higherPrioTaskWoken != pdFALSE) {
 		vPortYield();
