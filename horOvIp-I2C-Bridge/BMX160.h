@@ -37,7 +37,7 @@ void BMX160StopDataCapturing();
  * This call is synchronous.
  * You can access the data with \ref BMX160GetData()
  */
-void BMX160ReadoutSensors();
+bool BMX160ReadoutSensors();
 
 /** \brief Read the magnetometer factory trim registers
  *

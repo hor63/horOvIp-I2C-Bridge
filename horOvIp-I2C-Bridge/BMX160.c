@@ -369,8 +369,10 @@ static inline int16_t readMagValueRHall(uint8_t *lowByte) {
 	return rc;
 }
 
-static void readSensorDataWithoutMag() {
+static bool readSensorDataWithoutMag() {
 	enum I2CTransferResult transferResult;
+	bool rc = false;
+
 	// Now read the data and the Sensortime registers
 	dataBuf[0] = BMX160_DATA_REG + BMX160_DATA_GYR_X_LSB_OFFS;
 	transferResult = I2CTransferSendReceive(
@@ -395,7 +397,8 @@ static void readSensorDataWithoutMag() {
 		bmx160Data.accGyrData.gyrY = *((int16_t*)(dataBuf + (BMX160_DATA_GYR_Y_LSB_OFFS - BMX160_DATA_GYR_X_LSB_OFFS)));
 		bmx160Data.accGyrData.gyrZ = *((int16_t*)(dataBuf + (BMX160_DATA_GYR_Z_LSB_OFFS - BMX160_DATA_GYR_X_LSB_OFFS)));
 
-		/* */
+		rc = true;
+		/* +/
 			DEBUG_OUT("Sensor data no Mag, len = ");
 			DEBUG_UINT_OUT(bmx160Data.header.length);
 			DEBUG_OUT(", AccX = ");
@@ -403,13 +406,16 @@ static void readSensorDataWithoutMag() {
 			DEBUG_OUT(", GyrX = ");
 			DEBUG_INT_OUT(bmx160Data.accGyrData.gyrX);
 			DEBUG_OUT("\r\n");
-		/* */
+		/+ */
 
 	}
+
+	return rc;
 }
 
-static void readSensorDataWithMag() {
+static bool readSensorDataWithMag() {
 	enum I2CTransferResult transferResult;
+	bool rc = false;
 
 	// Now read the data and the Sensortime registers
 	dataBuf[0] = BMX160_DATA_REG;
@@ -439,6 +445,7 @@ static void readSensorDataWithMag() {
 		bmx160Data.accGyrMagData.magZ = readMagValueZ(dataBuf + (BMX160_DATA_MAG_Z_LSB_OFFS));
 		bmx160Data.accGyrMagData.magRHall = readMagValueRHall(dataBuf + (BMX160_DATA_RHALL_LSB_OFFS));
 
+		rc = true;
 
 	/* +/
 		DEBUG_OUT("Sensor data with Mag, len = ");
@@ -453,6 +460,7 @@ static void readSensorDataWithMag() {
 	/+ */
 	}
 
+	return rc;
 }
 
 
@@ -502,11 +510,73 @@ static void readTrimRegistersRawValues()
 	DEBUG_OUT("\r\n");
 }
 
+/** \brief Activate interrupt pin INT1 to signal Data Ready to the MCU.
+ *
+ * Activate pin INT1 (Pin 4) in push-pull mode.
+ * Set the pin High (1) when data ready condition is assumed.
+ *
+ * Pin INT1 is connected with pin PD4 (pin 15) on the MCU.
+ *
+ */
+static void EnableDataReadyInterrupt1() {
 
+	vTaskDelay(10/portTICK_PERIOD_MS);
+
+	// Enable the data ready interrupt
+	dataBuf[0] = BMX160_INT_EN_1;
+	dataBuf[1] = 1 << BMX160_INT_EN_1_DRDR_EN;
+
+	I2CTransferSend(
+			BMX160ADDR,dataBuf,
+			2,
+			NULL,NULL);
+
+	vTaskDelay(10/portTICK_PERIOD_MS);
+
+	// Set the pin as output, push-pull-mode, High level on
+	dataBuf[0] = BMX160_INT_OUT_CTRL;
+	dataBuf[1] = (1 << BMX160_INT_OUT_CTRL_INT1_OUT_EN)
+//			| (1 << BMX160_INT_OUT_CTRL_INT1_OPEN_DRAIN) // Open-Drain
+//			| (1 << BMX160_INT_OUT_CTRL_INT1_LVL)
+			| (1 << BMX160_INT_OUT_CTRL_INT1_EDGE_CTRL)
+			;
+
+	I2CTransferSend(
+			BMX160ADDR,dataBuf,
+			2,
+			NULL,NULL);
+
+	vTaskDelay(10/portTICK_PERIOD_MS);
+
+	// Set the pin as output, 5ms temporary latch
+	dataBuf[0] = BMX160_INT_LATCH;
+	// 5ms temporary latch, both INT pins not input.
+	dataBuf[1] = BMX160_INT_LATCH_TEMP_5MS;
+
+	I2CTransferSend(
+			BMX160ADDR,dataBuf,
+			2,
+			NULL,NULL);
+
+	// Map the data ready interrupt to INT1
+	dataBuf[0] = BMX160_INT_MAP_1;
+	dataBuf[1] = 1 << BMX160_INT_MAP_1_DRDY_INT_1;
+	vTaskDelay(10/portTICK_PERIOD_MS);
+
+	I2CTransferSend(
+			BMX160ADDR,dataBuf,
+			2,
+			NULL,NULL);
+
+	vTaskDelay(10/portTICK_PERIOD_MS);
+
+}
 
 void BMX160Init() {
 
 	resetSensor();
+
+	EnableDataReadyInterrupt1();
 
 	powerAllSensorsOn();
 
@@ -559,7 +629,6 @@ void BMX160ReadTrimRegisters()
 
 }
 
-
 void BMX160StartDataCapturing() {
 
 	/// todo fill me
@@ -572,22 +641,24 @@ void BMX160StopDataCapturing() {
 
 }
 
-void BMX160ReadoutSensors() {
+bool BMX160ReadoutSensors() {
 
 	// How often did you read the status before new data were present?
 	uint16_t numReadStatus = 0;
 	enum I2CTransferResult transferResult;
+	bool rc = true;
 
 	// Wait for data become ready. At least Gyro and Accel are always there when data are there at all.
 	do {
 		dataBuf[0] = BMX160_STATUS_REG;
 
-		transferResult = I2CTransferSendReceive(BMX160ADDR,dataBuf,1,dataBuf,1,NULL,NULL);
+		transferResult = I2CTransferSendReceive(BMX160ADDR,dataBuf,1,dataBuf+1,1,NULL,NULL);
 		if (transferResult != I2C_RC_OK) {
+			rc = false;
 			break;
 		}
 		numReadStatus ++;
-	}	while ((dataBuf[0] & (1<<BMX160_STATUS_DRDY_ACC | 1<<BMX160_STATUS_DRDY_GYR)) != (1<<BMX160_STATUS_DRDY_ACC | 1<<BMX160_STATUS_DRDY_GYR));
+	}	while ((dataBuf[1] & (1<<BMX160_STATUS_DRDY_ACC | 1<<BMX160_STATUS_DRDY_GYR)) != (1<<BMX160_STATUS_DRDY_ACC | 1<<BMX160_STATUS_DRDY_GYR));
 
 
 	if (transferResult == I2C_RC_OK) {
@@ -595,17 +666,42 @@ void BMX160ReadoutSensors() {
 		// At least Gyro and and Accel data are there.
 
 /* +/
-		DEBUG_OUT("New data present. Number status reads = ");
+		DEBUG_OUT("New data present. Status = ");
+		DEBUG_BYTE_HEX_OUT(dataBuf[1]);
+		DEBUG_OUT(" Number status reads = ");
 		DEBUG_UINT_OUT(numReadStatus);
 		DEBUG_OUT("\r\n");
+		dataBuf[0] = BMX160_INT_STATUS_0;
+		I2CTransferSendReceive(BMX160ADDR,dataBuf,1,dataBuf+2,4,NULL,NULL);
+		DEBUG_OUT("Int_Status= "); DEBUG_BYTE_HEX_OUT(dataBuf[2]);
+		DEBUG_CHR_OUT(' '); DEBUG_BYTE_HEX_OUT(dataBuf[3]);
+		DEBUG_CHR_OUT(' '); DEBUG_BYTE_HEX_OUT(dataBuf[4]);
+		DEBUG_CHR_OUT(' '); DEBUG_BYTE_HEX_OUT(dataBuf[5]);
+		DEBUG_OUT("\r\n");
 /+ */
-		if (dataBuf[0] & (1<<BMX160_STATUS_DRDY_MAG)) {
+		if (dataBuf[1] & (1<<BMX160_STATUS_DRDY_MAG)) {
 			// Mag data are present too.
-			readSensorDataWithMag();
+			rc = readSensorDataWithMag();
 		} else {
 			// Read only gyro and accel.
-			readSensorDataWithoutMag();
+			rc = readSensorDataWithoutMag();
 		}
+
+/*
+		dataBuf[0] = BMX160_STATUS_REG;
+		transferResult = I2CTransferSendReceive(BMX160ADDR,dataBuf,1,dataBuf+1,1,NULL,NULL);
+		DEBUG_OUT("Status after read = ");
+		DEBUG_BYTE_HEX_OUT(dataBuf[1]);
+		DEBUG_OUT("\r\n");
+
+		dataBuf[0] = BMX160_INT_STATUS_0;
+		I2CTransferSendReceive(BMX160ADDR,dataBuf,1,dataBuf+1,4,NULL,NULL);
+		DEBUG_OUT("Int_Status= "); DEBUG_BYTE_HEX_OUT(dataBuf[1]);
+		DEBUG_CHR_OUT(' '); DEBUG_BYTE_HEX_OUT(dataBuf[2]);
+		DEBUG_CHR_OUT(' '); DEBUG_BYTE_HEX_OUT(dataBuf[3]);
+		DEBUG_CHR_OUT(' '); DEBUG_BYTE_HEX_OUT(dataBuf[4]);
+		DEBUG_OUT("\r\n");
+*/
 
 		// Fill the constant header data.
 		bmx160Data.header.crc = 0XFFFF;
@@ -613,6 +709,8 @@ void BMX160ReadoutSensors() {
 		bmx160Data.header.versionMinor = BMX160_SENSORBOX_MSG_VERSION_MINOR;
 
 	}
+
+	return rc;
 }
 
 struct BMX160Data* BMX160GetData(){
