@@ -237,6 +237,44 @@
 // 1= Gyro self test suffessful, 0= Running or failed
 #define BMX160_STATUS_GYR_SELF_TEST_OK 1
 
+// Interrupt status registers
+#define BMX160_INT_STATUS_0 0x1C
+#define BMX160_INT_STATUS_1 0x1D
+#define BMX160_INT_STATUS_2 0x1E
+#define BMX160_INT_STATUS_3 0x1F
+// Interrupt masks
+#define BMX160_INT_STATUS_1_DRDY_INT 4
+
+// Interrupt enable registers
+#define BMX160_INT_EN_0 0x50
+#define BMX160_INT_EN_1 0x51
+#define BMX160_INT_EN_2 0x52
+// Enable masks
+#define BMX160_INT_EN_1_DRDR_EN 4
+
+// Electrical characteristic of interrupt lines
+#define BMX160_INT_OUT_CTRL 0x53
+// Enable INT1 output
+#define BMX160_INT_OUT_CTRL_INT1_OUT_EN 3
+// Open drain (1) or push-pull
+#define BMX160_INT_OUT_CTRL_INT1_OPEN_DRAIN 2
+// Define level of active interrupt (0 or 1)
+#define BMX160_INT_OUT_CTRL_INT1_LVL 1
+// Define edge (1) or level triggered interrupt
+#define BMX160_INT_OUT_CTRL_INT1_EDGE_CTRL 0
+
+#define BMX160_INT_LATCH 0x54
+#define BMX160_INT_LATCH_INT1_INP 0b00010000
+#define BMX160_INT_LATCH_INT2_INP 0b00100000
+#define BMX160_INT_LATCH_TEMP_5MS 0b0101
+
+// Interrupt mapping registers
+#define BMX160_INT_MAP_0 0x55
+#define BMX160_INT_MAP_1 0x56
+#define BMX160_INT_MAP_2 0x57
+// Mapping Masks
+#define BMX160_INT_MAP_1_DRDY_INT_1 7
+
 // Temperature as signed integer. 0x0000 = 23DegC. Resolution is 1/2^9 K/LSB, range is from ~ -41 - 87 DegC
 #define BMX160_TEMP_REG 0x20
 #define BMX160_TEMP_LSB_OFFS 0x00
