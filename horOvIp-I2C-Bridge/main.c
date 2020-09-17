@@ -11,6 +11,7 @@
 #include <avr/io.h>
 #include <avr/sleep.h>
 #include <avr/interrupt.h>
+#include <avr/cpufunc.h>
 #include <util/delay.h>
 
 #include "FreeRTOS.h"
@@ -31,10 +32,56 @@
 
 
 static void mainTask( void *pvParameters );
-static void vTestTimerFunction( TimerHandle_t xTimer );
+static void vBlinkTimerFunction( TimerHandle_t xTimer );
 static void vStatisticsTimerFunction( TimerHandle_t xTimer );
-static TimerHandle_t testTimer;
+static TimerHandle_t blinkTimerOn  = NULL;
+static TimerHandle_t blinkTimerOff = NULL;
 static TimerHandle_t statisticsTimer;
+
+#define DDR_LED DDRB
+#define PORT_LED PORTB
+#define PIN_LED PINB
+
+enum BMX160Status {
+	BMX160_STAT_UNDEF = 0,
+	BMX160_STAT_OK = 1,
+	BMX160_STAT_WARN = 2,
+	BMX160_STAT_ERR =3
+};
+
+static enum BMX160Status bmx160Status = BMX160_STAT_ERR;
+
+// Green
+#define LED_I2C_OK _BV(PORT2)
+// Red
+#define LED_I2C_ERR _BV(PORT3)
+// Yellow (green and red)
+#define LED_I2C_WARN (LED_I2C_OK|LED_I2C_ERR)
+// Mask to reset the pins before setting a new color
+#define LED_I2C_MASK (LED_I2C_OK|LED_I2C_ERR)
+
+enum CommStatus {
+	COMM_STAT_UNDEF = 0,
+	COMM_STAT_OK = 1,
+	COMM_STAT_WARN = 2,
+	COMM_STAT_ERR = 3
+};
+
+static enum CommStatus commStatus = COMM_STAT_ERR;
+
+// Green
+#define LED_COMM_OK _BV(PORT0)
+// Red
+#define LED_COMM_ERR _BV(PORT1)
+// Yellow (green and red)
+#define LED_COMM_WARN (LED_COMM_OK|LED_COMM_ERR)
+// Mask to reset the pins before setting a new color
+#define LED_COMM_MASK (LED_COMM_OK|LED_COMM_ERR)
+
+/** \brief Semaphore for synchronizing the UDP main task with the BMX160-Data-Ready signal line.
+ *
+ */
+static SemaphoreHandle_t bmx160DataReadySem = NULL;
 
 int main(void) {
 	
@@ -43,7 +90,8 @@ int main(void) {
 	DDRA = 0;
 	PORTA = 0xff;
 	DDRD = 0;
-	PORTD = 0xff;
+	// Switch off the pullup of PD6. This is the interrupt line from the BMX160.
+	PORTD = ~_BV(PD6);
 	// Do not touch the SPI pins which are being used by ISP programmers
 	DDRB &= _BV(PB5)|_BV(PB6)|_BV(PB7); // Do not touch MOSI, MISO and SCK
 	PORTB |= ~(_BV(PB5)|_BV(PB6)|_BV(PB7)); // Do not touch MOSI, MISO and SCK
@@ -51,8 +99,17 @@ int main(void) {
 	DDRC &= _BV(PC2)|_BV(PC3)|_BV(PC4)|_BV(PC5);
 	PORTC |= ~(_BV(PC2)|_BV(PC3)|_BV(PC4)|_BV(PC5));
 	
+	// Switch off the pull-ups on the LED pins. Otherwise they are glowing constantly.
+	// Leave the LEDs off when I switch them to Output mode.
+	PORT_LED &= ~(LED_I2C_MASK|LED_COMM_MASK);
+	// Switch the LED pins as output pins
+	DDR_LED |= LED_I2C_MASK|LED_COMM_MASK;
+
+	// Set sleep mode to idle mode. All peripherals remain running.
+	// This is a must because I am sleeping while I2C and USART are doing their thing,
+	// And the pin PD6 needs clocking to fire the interrupt when the BMX16 has data ready.
 	set_sleep_mode(0);
-	
+
 	// Start interrupts here
 	sei();
 
@@ -60,13 +117,11 @@ int main(void) {
 	sleep_enable();
 
 	xTaskCreate( mainTask, "TCPMain", configMINIMAL_STACK_SIZE * 3, NULL, TASK_PRIO_APP, NULL );
-	testTimer = xTimerCreate("Blinky",33,pdTRUE,vTestTimerFunction,vTestTimerFunction);
+	blinkTimerOn = xTimerCreate("BlinkOn",50/portTICK_PERIOD_MS,pdFALSE,(void*)1,vBlinkTimerFunction);
+	blinkTimerOff = xTimerCreate("BlinkOff",2950/portTICK_PERIOD_MS,pdFALSE,(void*)0,vBlinkTimerFunction);
 	statisticsTimer = xTimerCreate("Statistics",5000/portTICK_PERIOD_MS,pdTRUE,vStatisticsTimerFunction,vStatisticsTimerFunction);
-	xTimerStart(testTimer,10);
+	xTimerStart(blinkTimerOn,10);
 	xTimerStart(statisticsTimer,10);
-
-	// Set the direction of the LED pin output
-	DDRB |= _BV(DDB2);
 
 	vTaskStartScheduler();
 
@@ -75,10 +130,14 @@ int main(void) {
 void tcpipInitDoneCb (void* d) {
 	TaskHandle_t mainTask = (TaskHandle_t) d;
 
+	DEBUG_OUT("TCP PPP Init");
+
 	// Initialize PPP and startup the PPP listener.
 	pppAppInit();
 
 	xTaskNotifyGive(mainTask);
+
+	DEBUG_OUT("TCP startup done");
 
 }
 
@@ -91,6 +150,8 @@ static void mainTask( void *pvParameters ) {
 	DEBUG_OUT_START_MSG();
 	DEBUG_OUT("horOV IMU board V0.2");
 	DEBUG_OUT_END_MSG();
+
+	bmx160DataReadySem = xSemaphoreCreateBinary();
 
 	// Let other components start up safely, particularly the IMU but also other sensors
 	vTaskDelay(1000/portTICK_PERIOD_MS);
@@ -111,6 +172,14 @@ static void mainTask( void *pvParameters ) {
 	// Let the data capturing get into the swing
 	vTaskDelay(200/portTICK_PERIOD_MS);
 
+/* Sadly I am not getting the data ready interrupt of the BMX160 to work.
+	// Enable pin change interrupt 3
+	PCICR |= _BV(PCIE3);
+	// Enable PCINT30 mask to interrupt 3.
+	// PCINT30 is pin PD6. This is the pin connected to the INT1 pin of the BMX160.
+	PCMSK3 |= _BV(PCINT30);
+*/
+
 	//BMX160StartDataCapturing();
 
 	DEBUG_OUT_START_MSG();
@@ -123,18 +192,6 @@ static void mainTask( void *pvParameters ) {
 
 	ulTaskNotifyTake(pdTRUE,10000);
 
-	// Setup timer 3 as a simple overflow timer
-	// Output Pins OCN3A and OCN3B are disconnected.
-	// Operation mode "Normal", i.e. Counter running up until overflow.
-	TCCR3A = 0U;
-	// Input noise canceler off,
-	// Operation mode is Normal
-	// CLock select is system clock without prescaler.
-	TCCR3B = _BV(CS30);
-
-	// Enable timer 3 interrupt overflow.
-	TIMSK3 = _BV(TOIE3);
-
 	DEBUG_OUT_START_MSG();
 	DEBUG_OUT("STARTUP done");
 	DEBUG_OUT_END_MSG();
@@ -146,32 +203,85 @@ static void mainTask( void *pvParameters ) {
 
 }
 
-static void vTestTimerFunction( TimerHandle_t xTimer ) {
+static void vBlinkTimerFunction( TimerHandle_t xTimer ) {
 
-	// Toggle the pin
-	PINB = _BV(PINB2);
+	uint8_t ledSet;
+
+	if (pvTimerGetTimerID(xTimer) == (void*)1) {
+
+		// LED on timer fired.
+		// Now the dark period starts.
+		xTimerStart(blinkTimerOff,10);
+
+		// Make it dark when a defined status was assumed before.
+		if (bmx160Status == BMX160_STAT_UNDEF) {
+			// let the LED light up in yellow when no status update occurred
+			ledSet = LED_I2C_WARN;
+
+		} else {
+			ledSet = 0;
+			// Reset the status.
+			bmx160Status = BMX160_STAT_UNDEF;
+		}
+
+		if (commStatus == COMM_STAT_UNDEF) {
+			// Make the LEDs yellow
+			ledSet |= LED_COMM_WARN;
+		} else {
+			// Reset the status.
+			commStatus = COMM_STAT_UNDEF;
+		}
+
+		PORT_LED = (PORT_LED & ~(LED_I2C_MASK|LED_COMM_MASK)) | ledSet;
+		// Set the the pin to output
+		DDR_LED = (DDR_LED & ~(LED_I2C_MASK|LED_COMM_MASK)) | ledSet;
+
+
+	} else { // if (xTimer->pvTimerID == (void*)1)
+		// The dark timer expired.
+		// Now the bright period starts.
+		xTimerStart(blinkTimerOn,10);
+
+		ledSet = 0;
+
+		switch (bmx160Status) {
+		case BMX160_STAT_WARN:
+			ledSet = LED_I2C_WARN;
+			break;
+		case BMX160_STAT_OK:
+			ledSet = LED_I2C_OK;
+			break;
+		case BMX160_STAT_UNDEF:
+		case BMX160_STAT_ERR:
+		default:
+			ledSet = LED_I2C_ERR;
+			break;
+		}
+
+		switch (commStatus) {
+		case COMM_STAT_WARN:
+			ledSet |= LED_COMM_WARN;
+			break;
+		case COMM_STAT_OK:
+			ledSet |= LED_COMM_OK;
+			break;
+		case COMM_STAT_UNDEF:
+		case COMM_STAT_ERR:
+		default:
+			ledSet |= LED_COMM_ERR;
+			break;
+		}
+
+		// First switch the level high. If the direction is Input, switch on the pullup.
+		PORT_LED = (PORT_LED & ~(LED_I2C_MASK | LED_COMM_MASK)) | ledSet;
+		// Set the the pin to output
+		DDR_LED = (DDR_LED & ~(LED_I2C_MASK | LED_COMM_MASK)) | ledSet;
+
+	} // if (xTimer->pvTimerID == (void*)1)
 
 }
 
 static HeapStats_t heapStats;
-// Used to count the system clocks with timer 3
-// To form a 32-bit counter.
-static uint16_t numTimer3Overruns = 0;
-
-static uint32_t clocksBeforeSleep = 0;
-static uint32_t clocksInSleep = 0;
-
-static uint32_t getSysClocks() {
-	uint32_t ret;
-
-	portENTER_CRITICAL();
-
-	ret = ((uint32_t)numTimer3Overruns << 16) + TCNT3;
-
-	portEXIT_CRITICAL();
-
-	return ret;
-}
 
 static void vStatisticsTimerFunction( TimerHandle_t xTimer ) {
 
@@ -188,32 +298,16 @@ static void vStatisticsTimerFunction( TimerHandle_t xTimer ) {
 
 	DEBUG_OUT("\r\nFreeSpace = ");
 	DEBUG_UINT_OUT(heapStats.xAvailableHeapSpaceInBytes);
-	DEBUG_OUT("\r\nSuccessAllocations = ");
-	DEBUG_UINT_OUT(heapStats.xNumberOfSuccessfulAllocations);
-	DEBUG_OUT("\r\nSuccessFrees = ");
-	DEBUG_UINT_OUT(heapStats.xNumberOfSuccessfulFrees);
 	DEBUG_OUT("\r\nMinEverSpace = ");
 	DEBUG_UINT_OUT(heapStats.xMinimumEverFreeBytesRemaining);
-	DEBUG_OUT("\r\nClocks = ");
-	DEBUG_ULONG_OUT(getSysClocks());
-	DEBUG_OUT("\r\nClocks in sleep = ");
-	DEBUG_ULONG_OUT(clocksInSleep);
 	DEBUG_OUT("\r\n\r\n");
 
 }
 
 void vApplicationIdleHook( void ) {
 
-	uint32_t currSysClocks;
-
-
-	clocksBeforeSleep = getSysClocks();
-
 	sleep_cpu();
 
-	currSysClocks = getSysClocks();
-
-	clocksInSleep += (currSysClocks - clocksBeforeSleep);
 }
 
 
@@ -315,6 +409,7 @@ static void udpMainLoop(){
 	static struct netconn *udpSendConn;
 	static struct netbuf *netb;
 	static void *netBufData;
+	static bool bmx160DataValid;
 
 	bmx160Data = BMX160GetData();
 
@@ -340,9 +435,9 @@ static void udpMainLoop(){
 
 			netconn_set_nonblocking(udpSendConn,1);
 
-			while (!isPPPRunning()) {
-				vTaskDelay(500/portTICK_PERIOD_MS);
-			}
+//			while (!isPPPRunning()) {
+//				vTaskDelay(500/portTICK_PERIOD_MS);
+//			}
 
 
 			lastTick = xTaskGetTickCount();
@@ -353,12 +448,29 @@ static void udpMainLoop(){
 				DEBUG_UINT_OUT(bmx160Data->header.length);
 				DEBUG_OUT(" bytes\r\n");
 				/+ */
-				vTaskDelayUntil(&lastTick,20/portTICK_PERIOD_MS);
+				vTaskDelayUntil(&lastTick,16/portTICK_PERIOD_MS);
+//				DEBUG_OUT("Wait for data ready\r\n");
+				/*
+				if (xSemaphoreTake(bmx160DataReadySem,30/portTICK_PERIOD_MS) == pdFALSE) {
+					DEBUG_OUT("Data ready Sem timeout\r\n");
+					if (bmx160Status < I2C_STAT_WARN) {
+						bmx160Status = I2C_STAT_WARN;
+					}
+				}
+				*/
 
-				BMX160ReadoutSensors();
-				// I wait 15 ms from now, after data are actually valid.
+				bmx160DataValid = BMX160ReadoutSensors();
+				if (bmx160DataValid) {
+					if (bmx160Status < BMX160_STAT_OK) {
+						bmx160Status = BMX160_STAT_OK;
+					}
+				} else {
+					bmx160Status = BMX160_STAT_ERR;
+				}
+
+				// I wait 10 ms from now, after data are actually valid.
 				lastTick = xTaskGetTickCount();
-				if (isPPPRunning()) {
+				if (bmx160DataValid && isPPPRunning()) {
 					netb = netbuf_new();
 					netBufData = netbuf_alloc(netb,sizeof(struct BMX160Data));
 					memcpy(netBufData,bmx160Data,sizeof(struct BMX160Data));
@@ -394,8 +506,29 @@ static void udpMainLoop(){
 							resendCalibrationData = false;
 						}
 
+						if (err == ERR_OK) {
+							if (commStatus < COMM_STAT_OK) {
+								commStatus = COMM_STAT_OK;
+							}
+						} else {
+							if (err == ERR_WOULDBLOCK) {
+								if (commStatus < COMM_STAT_WARN) {
+									commStatus = COMM_STAT_WARN;
+								}
+							} else {
+								commStatus = COMM_STAT_ERR;
+							}
+						}
+					} // if (err == ERR_OK)
+				} else { // if (i2CStatus < I2C_STAT_ERR && isPPPRunning())
+					if (isPPPRunning()) {
+						if (commStatus < COMM_STAT_OK) {
+							commStatus = COMM_STAT_OK;
+						}
+					} else {
+						commStatus = COMM_STAT_ERR;
 					}
-				}
+				} // if (i2CStatus < I2C_STAT_ERR && isPPPRunning())
 
 			}
 
@@ -417,11 +550,29 @@ static void udpMainLoop(){
 
 	}
 
-
-
 }
 
-ISR(TIMER3_OVF_vect) {
-	numTimer3Overruns ++;
-}
+/* Sadly I am not getting the data ready interrupt of the BMX160 to work.
+// External pin interrupt.
+ISR(PCINT3_vect){
+	static uint8_t lastPD6Value = 0;
+	uint8_t currPD6Value = (PIND & _BV(PIND6));
+	BaseType_t higherPrioTaskWoken = pdFALSE;
 
+	// If a transition from low to high occurred on PD6
+	if ((currPD6Value && !lastPD6Value)) {
+		xSemaphoreGiveFromISR(bmx160DataReadySem,&higherPrioTaskWoken);
+	}
+
+	lastPD6Value = currPD6Value;
+
+	// Flush out all registers to memory.
+	_MemoryBarrier();
+
+#if configUSE_PREEMPTION
+	if (higherPrioTaskWoken != pdFALSE) {
+		vPortYield();
+	}
+#endif
+}
+*/
