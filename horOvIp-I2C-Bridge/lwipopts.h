@@ -86,7 +86,7 @@
 #define PPP_SUPPORT						1
 #define LWIP_PPP_API					1
 #define PPP_USE_PBUF_RAM                1
-#define PAP_SUPPORT                     0
+#define PAP_SUPPORT                     1
 #define CHAP_SUPPORT                    0
 #define MSCHAP_SUPPORT                  0
 #define EAP_SUPPORT                     0
